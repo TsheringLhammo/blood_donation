@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Popup Message System - Blood Bank</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .main-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15);
+            padding: 40px;
+            max-width: 1200px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .demo-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            border-left: 4px solid #667eea;
+        }
+
+        .demo-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .demo-header h2 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        .demo-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .demo-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .demo-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .demo-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.2);
+        }
+
+        .demo-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3));
+            transition: left 0.5s ease;
+        }
+
+        .demo-btn:hover::before {
+            left: 100%;
+        }
+
+        .popup-demo {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+            position: relative;
+        }
+
+        .popup-demo-title {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #667eea;
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        /* Enhanced Popup Styles */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            display: none;
+            z-index: 9999;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .popup-overlay.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .popup-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 0;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
+            animation: slideUpBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .popup-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px 30px;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .popup-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: -2px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 1px;
+        }
+
+        .popup-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .popup-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            padding: 0;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            backdrop-filter: blur(5px);
+        }
+
+        .popup-close:hover {
+            opacity: 1;
+            transform: rotate(90deg) scale(1.1);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .popup-body {
+            padding: 30px;
+            text-align: center;
+        }
+
+        .popup-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+        }
+
+        .popup-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            position: relative;
+            animation: pulse 2s infinite;
+        }
+
+        .popup-message {
+            font-size: 16px;
+            color: #333;
+            line-height: 1.6;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .popup-timestamp {
+            font-size: 12px;
+            color: #888;
+            margin-top: 15px;
+        }
+
+        .popup-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .popup-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .popup-btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .popup-btn-secondary {
+            background: #6c757d;
+            color: white;
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        .popup-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .popup-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2));
+            transition: left 0.5s ease;
+        }
+
+        .popup-btn:hover::before {
+            left: 100%;
+        }
+
+        /* Toast Notification Styles */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+        }
+
+        .toast {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            margin-bottom: 15px;
+            min-width: 350px;
+            max-width: 450px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            animation: slideInRight 0.5s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .toast::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: #667eea;
+            border-radius: 2px 0 0 2px;
+        }
+
+        .toast.success::before {
+            background: #28a745;
+        }
+
+        .toast.warning::before {
+            background: #ffc107;
+        }
+
+        .toast.error::before {
+            background: #dc3545;
+        }
+
+        .toast.info::before {
+            background: #17a2b8;
+        }
+
+        .toast-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .toast-message {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.3s ease;
+            color: #666;
+            padding: 5px;
+            line-height: 1;
+        }
+
+        .toast-close:hover {
+            opacity: 1;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUpBounce {
+            0% {
+                opacity: 0;
+                transform: translateY(50px) scale(0.3);
+            }
+            60% {
+                opacity: 1;
+                transform: translateY(-10px) scale(1.05);
+            }
+            80% {
+                transform: translateY(5px) scale(0.95);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .demo-buttons {
+                grid-template-columns: 1fr;
+            }
+            
+            .popup-modal {
+                width: 95%;
+                margin: 10px;
+            }
+            
+            .toast {
+                min-width: 280px;
+                max-width: 90%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-container {
+                padding: 15px;
+            }
+            
+            .demo-section {
+                padding: 20px;
+            }
+            
+            .popup-modal {
+                padding: 20px;
+            }
+            
+            .popup-content {
+                gap: 15px;
+            }
+            
+            .popup-actions {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .popup-btn {
+                padding: 10px 20px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="demo-section">
+            <div class="demo-header">
+                <h2>🎨 Enhanced Popup Message System</h2>
+            </div>
+            <div class="demo-buttons">
+                <button class="demo-btn" onclick="showSuccessPopup()">
+                    ✅ Success Popup
+                </button>
+                <button class="demo-btn" onclick="showWarningPopup()">
+                    ⚠️ Warning Popup
+                </button>
+                <button class="demo-btn" onclick="showErrorPopup()">
+                    ❌ Error Popup
+                </button>
+                <button class="demo-btn" onclick="showInfoPopup()">
+                    ℹ️ Info Popup
+                </button>
+                <button class="demo-btn" onclick="showDonorStatusPopup()">
+                    👤 Donor Status
+                </button>
+                <button class="demo-btn" onclick="showAppointmentPopup()">
+                    📅 Appointment
+                </button>
+                <button class="demo-btn" onclick="showTestResultsPopup()">
+                    🧪 Test Results
+                </button>
+                <button class="demo-btn" onclick="showDeferralPopup()">
+                    ⏸️ Deferral Notice
+                </button>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <div class="demo-header">
+                <h2>🔔 Popup Message Preview</h2>
+            </div>
+            <div class="popup-demo" id="popup-preview">
+                <div class="popup-demo-title">Click any button above to see popup examples</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Popup Modal -->
+    <div id="popup-overlay" class="popup-overlay">
+        <div class="popup-modal">
+            <div class="popup-header">
+                <h3 class="popup-title" id="popup-title">Notification</h3>
+                <button class="popup-close" onclick="closePopup()">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="popup-content">
+                    <div class="popup-icon" id="popup-icon">ℹ️</div>
+                    <div class="popup-message" id="popup-message">Notification message here</div>
+                    <div class="popup-timestamp" id="popup-timestamp">Just now</div>
+                </div>
+                <div class="popup-actions">
+                    <button class="popup-btn popup-btn-primary" id="popup-action-1" onclick="closePopup()">OK</button>
+                    <button class="popup-btn popup-btn-secondary" id="popup-action-2" onclick="markAsRead()">Mark as Read</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script>
+        class EnhancedPopupSystem {
+            constructor() {
+                this.notifications = [];
+                this.container = null;
+                this.init();
+            }
+
+            init() {
+                this.createContainer();
+                this.addStyles();
+                this.setupEventListeners();
+            }
+
+            createContainer() {
+                this.container = document.createElement('div');
+                this.container.id = 'enhanced-popup-system';
+                this.container.className = 'enhanced-popup-system';
+                document.body.appendChild(this.container);
+            }
+
+            addStyles() {
+                const styles = `
+                    #enhanced-popup-system {
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        z-index: 10000;
+                        pointer-events: none;
+                    }
+
+                    .enhanced-toast {
+                        background: white;
+                        border-radius: 15px;
+                        padding: 20px;
+                        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+                        margin-bottom: 15px;
+                        min-width: 350px;
+                        max-width: 450px;
+                        display: flex;
+                        align-items: center;
+                        gap: 15px;
+                        animation: slideInRight 0.5s ease;
+                        position: relative;
+                        overflow: hidden;
+                        border-left: 4px solid #667eea;
+                    }
+
+                    .enhanced-toast::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 4px;
+                        height: 100%;
+                        background: #667eea;
+                        border-radius: 2px 0 0 2px;
+                    }
+
+                    .enhanced-toast.success::before {
+                        background: #28a745;
+                    }
+
+                    .enhanced-toast.warning::before {
+                        background: #ffc107;
+                    }
+
+                    .enhanced-toast.error::before {
+                        background: #dc3545;
+                    }
+
+                    .enhanced-toast.info::before {
+                        background: #17a2b8;
+                    }
+
+                    .enhanced-toast-icon {
+                        font-size: 24px;
+                        margin-right: 10px;
+                        animation: iconBounce 1s ease-in-out;
+                    }
+
+                    .enhanced-toast-content {
+                        flex: 1;
+                    }
+
+                    .enhanced-toast-title {
+                        font-weight: 600;
+                        color: #333;
+                        margin-bottom: 5px;
+                    }
+
+                    .enhanced-toast-message {
+                        color: #555;
+                        font-size: 14px;
+                        line-height: 1.4;
+                    }
+
+                    .enhanced-toast-close {
+                        background: none;
+                        border: none;
+                        font-size: 20px;
+                        cursor: pointer;
+                        opacity: 0.6;
+                        transition: opacity 0.3s ease;
+                        color: #666;
+                        padding: 5px;
+                        line-height: 1;
+                    }
+
+                    .enhanced-toast-close:hover {
+                        opacity: 1;
+                    }
+
+                    @keyframes iconBounce {
+                        0%, 20%, 50%, 80%, 100% {
+                            transform: translateY(0);
+                        }
+                        40% {
+                            transform: translateY(-5px);
+                        }
+                        60% {
+                            transform: translateY(-3px);
+                        }
+                    }
+
+                    /* Mobile responsive */
+                    @media (max-width: 768px) {
+                        .enhanced-toast {
+                            min-width: 280px;
+                            max-width: 90%;
+                        }
+                    }
+                `;
+
+                const styleSheet = document.createElement('style');
+                styleSheet.textContent = styles;
+                document.head.appendChild(styleSheet);
+            }
+
+            setupEventListeners() {
+                // Close on Escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        this.closeAll();
+                    }
+                });
+
+                // Close on background click
+                document.addEventListener('click', (e) => {
+                    if (e.target === this.container) {
+                        this.closeAll();
+                    }
+                });
+            }
+
+            show(options) {
+                const {
+                    title = 'Notification',
+                    message = '',
+                    type = 'info',
+                    duration = 5000,
+                    persistent = false,
+                    actions = [],
+                    animation = 'slide-up-bounce'
+                } = options;
+
+                const notification = this.createNotification(title, message, type, actions, animation);
+                this.container.appendChild(notification);
+
+                // Show with animation
+                setTimeout(() => {
+                    notification.classList.add('show');
+                }, 100);
+
+                // Auto close if not persistent
+                if (!persistent && duration > 0) {
+                    setTimeout(() => {
+                        this.close(notification);
+                    }, duration);
+                }
+
+                return notification;
+            }
+
+            createNotification(title, message, type, actions, animation) {
+                const notification = document.createElement('div');
+                notification.className = `enhanced-toast ${type}`;
+                
+                const iconMap = {
+                    success: '✅',
+                    warning: '⚠️',
+                    error: '❌',
+                    info: 'ℹ️'
+                };
+
+                notification.innerHTML = `
+                    <div class="enhanced-toast-icon">${iconMap[type] || iconMap.info}</div>
+                    <div class="enhanced-toast-content">
+                        <div class="enhanced-toast-title">${title}</div>
+                        <div class="enhanced-toast-message">${message}</div>
+                    </div>
+                    <button class="enhanced-toast-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
+                `;
+
+                return notification;
+            }
+
+            close(notification) {
+                if (notification) {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }
+
+            closeAll() {
+                const notifications = this.container.querySelectorAll('.enhanced-toast');
+                notifications.forEach(notification => {
+                    this.close(notification);
+                });
+            }
+
+            // Specialized notification methods
+            showSuccess(title, message, options = {}) {
+                return this.show({
+                    title,
+                    message,
+                    type: 'success',
+                    duration: options.duration || 4000,
+                    animation: options.animation || 'slide-up-bounce',
+                    ...options
+                });
+            }
+
+            showWarning(title, message, options = {}) {
+                return this.show({
+                    title,
+                    message,
+                    type: 'warning',
+                    duration: options.duration || 5000,
+                    animation: options.animation || 'slide-up-bounce',
+                    ...options
+                });
+            }
+
+            showError(title, message, options = {}) {
+                return this.show({
+                    title,
+                    message,
+                    type: 'error',
+                    duration: options.duration || 6000,
+                    animation: options.animation || 'slide-up-bounce',
+                    persistent: options.persistent || false,
+                    ...options
+                });
+            }
+
+            showInfo(title, message, options = {}) {
+                return this.show({
+                    title,
+                    message,
+                    type: 'info',
+                    duration: options.duration || 4000,
+                    animation: options.animation || 'slide-up-bounce',
+                    ...options
+                });
+            }
+
+            // Specialized notifications with enhanced design
+            showDonorStatusUpdate(donorName, oldStatus, newStatus) {
+                return this.show({
+                    title: '👤 Donor Status Updated',
+                    message: `<strong>${donorName}</strong><br><br>Status changed from <em>${oldStatus}</em> to <strong>${newStatus}</strong><br><br><small style="color: #666;">Updated: ${new Date().toLocaleString()}</small>`,
+                    type: 'info',
+                    duration: 6000,
+                    actions: [
+                        {
+                            text: 'View Details',
+                            onclick: `viewDonorDetails('${donorName}')`
+                        },
+                        {
+                            text: 'Contact Donor',
+                            onclick: `contactDonor('${donorName}')`
+                        }
+                    ]
+                });
+            }
+
+            showAppointmentReminder(donorName, appointmentDate, appointmentTime) {
+                return this.show({
+                    title: '📅 Appointment Reminder',
+                    message: `<strong>${donorName}</strong> has an appointment scheduled:<br><br><strong>Date:</strong> ${appointmentDate}<br><strong>Time:</strong> ${appointmentTime}<br><br><small style="color: #666;">Please arrive 15 minutes early with valid ID</small>`,
+                    type: 'warning',
+                    duration: 8000,
+                    actions: [
+                        {
+                            text: 'Confirm Attendance',
+                            onclick: `confirmAppointment('${donorName}')`
+                        },
+                        {
+                            text: 'Reschedule',
+                            onclick: `rescheduleAppointment('${donorName}')`
+                        },
+                        {
+                            text: 'Cancel Appointment',
+                            onclick: `cancelAppointment('${donorName}')`
+                        }
+                    ]
+                });
+            }
+
+            showTestResults(donorName, results) {
+                const resultText = Object.entries(results)
+                    .map(([key, value]) => `${key}: ${value}`)
+                    .join('<br>');
+                
+                return this.show({
+                    title: '🧪 Test Results Available',
+                    message: `<strong>${donorName}</strong><br><br>Test Results:<br><br>${resultText}<br><br><small style="color: #666;">Generated: ${new Date().toLocaleString()}</small>`,
+                    type: 'info',
+                    duration: 10000,
+                    actions: [
+                        {
+                            text: 'Download Report',
+                            onclick: `downloadTestReport('${donorName}')`
+                        },
+                        {
+                            text: 'Share Results',
+                            onclick: `shareTestResults('${donorName}')`
+                        }
+                    ]
+                });
+            }
+
+            showDeferralUpdate(donorName, deferralType, deferralPeriod, deferralReason) {
+                return this.show({
+                    title: '⏸️ Deferral Status Update',
+                    message: `<strong>${donorName}</strong> has been deferred for <strong>${deferralPeriod}</strong><br><br>Type: <strong>${deferralType}</strong><br><br>Reason: ${deferralReason}<br><br><small style="color: #666;">Please contact support if you have questions</small>`,
+                    type: 'warning',
+                    duration: 8000,
+                    actions: [
+                        {
+                            text: 'View Deferral Details',
+                            onclick: `viewDeferralDetails('${donorName}')`
+                        },
+                        {
+                            text: 'Contact Support',
+                            onclick: `contactSupport('${donorName}')`
+                        },
+                        {
+                            text: 'Set Reminder',
+                            onclick: `setDeferralReminder('${donorName}')`
+                        }
+                    ]
+                });
+            }
+
+            showSystemMaintenance(startTime, endTime) {
+                return this.show({
+                    title: '🔧 System Maintenance',
+                    message: `The blood bank system will be under maintenance from<br><br><strong>Start:</strong> ${startTime}<br><strong>End:</strong> ${endTime}<br><br><small style="color: #666;">Please save your work and log out before this time</small>`,
+                    type: 'info',
+                    duration: 15000,
+                    persistent: true
+                });
+            }
+
+            showWelcomeMessage(userName) {
+                return this.show({
+                    title: '👋 Welcome to Blood Bank System',
+                    message: `Welcome back, <strong>${userName}</strong>!<br><br>The system is ready for use.<br><br><small style="color: #666;">Last login: ${new Date().toLocaleString()}</small>`,
+                    type: 'success',
+                    duration: 5000
+                });
+            }
+
+            // Popup control functions
+            updatePopupContent(title, message, icon, type, timestamp, actions) {
+                document.getElementById('popup-title').textContent = title;
+                document.getElementById('popup-message').innerHTML = message;
+                document.getElementById('popup-timestamp').textContent = timestamp;
+                
+                // Update icon
+                const iconElement = document.getElementById('popup-icon');
+                iconElement.textContent = icon;
+                
+                // Update header background based on type
+                const headerElement = document.querySelector('.popup-header');
+                if (type === 'success') {
+                    headerElement.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+                } else if (type === 'warning') {
+                    headerElement.style.background = 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)';
+                } else if (type === 'error') {
+                    headerElement.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
+                } else {
+                    headerElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                }
+                
+                // Update actions
+                const actionsContainer = document.querySelector('.popup-actions');
+                if (actions && actions.length > 0) {
+                    actionsContainer.innerHTML = actions.map(action => 
+                        `<button class="popup-btn popup-btn-primary" onclick="${action.onclick}">${action.text}</button>`
+                    ).join('');
+                    
+                    // Update action buttons
+                    document.getElementById('popup-action-1').textContent = actions[0].text;
+                    if (actions[1]) {
+                        const action2Btn = document.getElementById('popup-action-2');
+                        action2Btn.textContent = actions[1].text;
+                        action2Btn.style.display = 'block';
+                    } else {
+                        document.getElementById('popup-action-2').style.display = 'none';
+                    }
+                } else {
+                    actionsContainer.innerHTML = '<button class="popup-btn popup-btn-primary" onclick="closePopup()">OK</button>';
+                    document.getElementById('popup-action-1').textContent = 'OK';
+                    document.getElementById('popup-action-2').style.display = 'none';
+                }
+            }
+
+            closePopup() {
+                const overlay = document.getElementById('popup-overlay');
+                if (overlay) {
+                    overlay.classList.remove('show');
+                    setTimeout(() => {
+                        if (overlay.parentNode) {
+                            overlay.parentNode.removeChild(overlay);
+                        }
+                    }, 300);
+                }
+            }
+
+            markAsRead() {
+                this.showSuccess('Marked as Read', 'Notification has been marked as read');
+                this.closePopup();
+            }
+
+            // Global functions for onclick handlers
+            window.viewDonorDetails = (donorName) => {
+                this.showInfo('Donor Details', `Viewing detailed information for ${donorName}`);
+            };
+
+            window.contactDonor = (donorName) => {
+                this.showInfo('Contact Donor', `Opening contact options for ${donorName}`);
+            };
+
+            window.confirmAppointment = (donorName) => {
+                this.showSuccess('Appointment Confirmed', `Appointment for ${donorName} has been confirmed`);
+            };
+
+            window.rescheduleAppointment = (donorName) => {
+                this.showInfo('Reschedule Appointment', `Opening reschedule options for ${donorName}`);
+            };
+
+            window.cancelAppointment = (donorName) => {
+                this.showWarning('Appointment Cancelled', `Appointment for ${donorName} has been cancelled`);
+            };
+
+            window.downloadTestReport = (donorName) => {
+                this.showSuccess('Report Downloaded', `Test report for ${donorName} is being downloaded`);
+            };
+
+            window.shareTestResults = (donorName) => {
+                this.showSuccess('Results Shared', `Test results for ${donorName} have been shared`);
+            };
+
+            window.viewDeferralDetails = (donorName) => {
+                this.showInfo('Deferral Details', `Viewing deferral details for ${donorName}`);
+            };
+
+            window.contactSupport = (donorName) => {
+                this.showInfo('Contact Support', `Opening support options for ${donorName}`);
+            };
+
+            window.setDeferralReminder = (donorName) => {
+                this.showSuccess('Reminder Set', `Deferral reminder has been set for ${donorName}`);
+            };
+        }
+
+        // Initialize enhanced popup system
+        document.addEventListener('DOMContentLoaded', () => {
+            window.enhancedPopupSystem = new EnhancedPopupSystem();
+            console.log('Enhanced Popup Message System initialized');
+        });
+
+        // Demo functions
+        function showSuccessPopup() {
+            window.enhancedPopupSystem.showSuccess(
+                'Operation Successful',
+                'Your action has been completed successfully. The system has been updated with the latest information.'
+            );
+        }
+
+        function showWarningPopup() {
+            window.enhancedPopupSystem.showWarning(
+                'Attention Required',
+                'Please review this notification carefully. Some action may be required on your part to ensure smooth operation of the blood bank system.'
+            );
+        }
+
+        function showErrorPopup() {
+            window.enhancedPopupSystem.showError(
+                'System Error',
+                'An unexpected error occurred while processing your request. Please try again or contact system administrator if the problem persists.'
+            );
+        }
+
+        function showInfoPopup() {
+            window.enhancedPopupSystem.showInfo(
+                'System Information',
+                'This is an informational message from the blood bank management system. No action is required at this time.'
+            );
+        }
+
+        function showDonorStatusPopup() {
+            window.enhancedPopupSystem.showDonorStatusUpdate(
+                'John Doe',
+                'Pending Review',
+                'Approved for Blood Donation'
+            );
+        }
+
+        function showAppointmentPopup() {
+            window.enhancedPopupSystem.showAppointmentReminder(
+                'Jane Smith',
+                'December 15, 2026',
+                '10:30 AM'
+            );
+        }
+
+        function showTestResultsPopup() {
+            const testResults = {
+                'Blood Type': 'O+',
+                'HIV': 'Negative',
+                'Hepatitis B': 'Negative',
+                'Hepatitis C': 'Negative',
+                'Syphilis': 'Negative',
+                'Malaria': 'Negative',
+                'Overall': 'All Clear'
+            };
+            
+            window.enhancedPopupSystem.showTestResults('John Doe', testResults);
+        }
+
+        function showDeferralPopup() {
+            window.enhancedPopupSystem.showDeferralUpdate(
+                'Robert Johnson',
+                'Temporary',
+                '6 months',
+                'Reactive test result - requires medical follow-up'
+            );
+        }
+
+        // Close popup on overlay click
+        document.getElementById('popup-overlay').addEventListener('click', function(e) {
+            if (e.target === document.getElementById('popup-overlay')) {
+                window.enhancedPopupSystem.closePopup();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                window.enhancedPopupSystem.closePopup();
+            }
+        });
+    </script>
+</body>
+</html>

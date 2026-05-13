@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Working Blood Bank Management System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            padding: 20px;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .system-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .panel-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .panel-content {
+            padding: 30px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .donor-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        .donor-table th,
+        .donor-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .donor-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .donor-table tr:hover {
+            background: #f8f9fa;
+            transition: background 0.3s ease;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+        }
+
+        .status-awaiting { 
+            background: #fff3cd; 
+            color: #856404; 
+            border: 1px solid #ffeaa7;
+        }
+        .status-approved { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb;
+        }
+        .status-deferred { 
+            background: #f8d7da; 
+            color: #856404; 
+            border: 1px solid #f5c6cb;
+        }
+        .status-rejected { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb;
+        }
+        .status-ready { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-approve { 
+            background: #28a745; 
+            color: white; 
+            border: 1px solid #28a745;
+        }
+        .btn-defer { 
+            background: #ffc107; 
+            color: #212529; 
+            border: 1px solid #ffc107;
+        }
+        .btn-reject { 
+            background: #dc3545; 
+            color: white; 
+            border: 1px solid #dc3545;
+        }
+        .btn-edit { 
+            background: #6c757d; 
+            color: white; 
+            border: 1px solid #6c757d;
+        }
+
+        .donor-selector {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .donor-selector h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .donor-selector select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .donor-selector select:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .donor-status-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .donor-status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .donor-status-display {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .status-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .donor-info {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .donor-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .donor-detail-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .donor-detail-label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .donor-detail-value {
+            color: #333;
+            font-size: 16px;
+        }
+
+        .notification-area {
+            background: #e8f5e8;
+            border-radius: 15px;
+            padding: 30px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .notification-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .notification-count {
+            background: #667eea;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .notification-item {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 5px solid #667eea;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .notification-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .notification-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 15px;
+        }
+
+        .notification-text {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .notification-time {
+            font-size: 12px;
+            color: #888;
+            white-space: nowrap;
+        }
+
+        .notification-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mini-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            background: #667eea;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .mini-btn:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        /* Working Popup System */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(10px);
+            display: none;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .popup-overlay.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .popup-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 0;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.25);
+            animation: slideUpBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .popup-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .popup-title {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .popup-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            line-height: 1;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .popup-close:hover {
+            opacity: 1;
+            transform: rotate(90deg) scale(1.1);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .popup-body {
+            padding: 35px;
+            text-align: center;
+        }
+
+        .popup-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+        }
+
+        .popup-icon {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.3);
+            animation: pulse 2s infinite;
+        }
+
+        .popup-message {
+            font-size: 18px;
+            color: #333;
+            line-height: 1.6;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        .popup-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .popup-btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 140px;
+        }
+
+        .popup-btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .popup-btn-secondary {
+            background: #6c757d;
+            color: white;
+            box-shadow: 0 6px 20px rgba(108, 117, 125, 0.3);
+        }
+
+        .popup-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Deferral Options */
+        .deferral-options {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 25px 0;
+            border-left: 5px solid #ffc107;
+        }
+
+        .deferral-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .deferral-duration {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .duration-option {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .duration-option:hover {
+            border-color: #ffc107;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 193, 7, 0.2);
+        }
+
+        .duration-option.selected {
+            border-color: #ffc107;
+            background: linear-gradient(135deg, #fff9c4, #ffeaa7);
+            box-shadow: 0 5px 15px rgba(255, 193, 7, 0.3);
+        }
+
+        .duration-months {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .duration-text {
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .deferral-reason {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            width: 100%;
+            font-size: 16px;
+            color: #333;
+            transition: all 0.3s ease;
+        }
+
+        .deferral-reason:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUpBounce {
+            0% {
+                opacity: 0;
+                transform: translateY(50px) scale(0.3);
+            }
+            60% {
+                opacity: 1;
+                transform: translateY(-10px) scale(1.05);
+            }
+            80% {
+                transform: translateY(5px) scale(0.95);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .system-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .donor-details {
+                grid-template-columns: 1fr;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+                gap: 5px;
+            }
+            
+            .btn {
+                padding: 6px 12px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="header">
+            <h1>🩸 Working Blood Bank Management System</h1>
+            <p>Fully functional system with working buttons, lists, and notifications</p>
+        </div>
+
+        <div class="system-grid">
+            <!-- Admin Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h1 class="panel-title">🩸 Admin Dashboard</h1>
+                    <div class="panel-subtitle">Blood Bank Management</div>
+                </div>
+                
+                <!-- Statistics -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-donors">6</div>
+                        <div class="stat-label">Total Donors</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="approved-donors">2</div>
+                        <div class="stat-label">Approved</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="deferred-donors">2</div>
+                        <div class="stat-label">Deferred</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="stage2-donors">2</div>
+                        <div class="stat-label">Stage 2</div>
+                    </div>
+                </div>
+
+                <!-- Donors Management -->
+                <div class="panel-content">
+                    <table class="donor-table" id="donors-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Blood Type</th>
+                                <th>Test Result</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="donors-tbody">
+                            <!-- Donors list will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Donor Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h1 class="panel-title">👤 Donor Dashboard</h1>
+                    <div class="panel-subtitle">Donor Status & Information</div>
+                </div>
+
+                <!-- Donor Selector -->
+                <div class="donor-selector">
+                    <h3>Select Donor</h3>
+                    <select id="donor-select">
+                        <option value="">Choose a donor...</option>
+                    </select>
+                </div>
+
+                <!-- Donor Status Card -->
+                <div class="donor-status-card">
+                    <div class="donor-status-header">
+                        <div class="donor-status-display">
+                            <div class="status-icon" id="status-icon">👤</div>
+                            <div>
+                                <h2 id="donor-status">No donor selected</h2>
+                                <p id="donor-message">Please select a donor to view their status</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Donor Information -->
+                <div class="donor-info" id="donor-info">
+                    <h3 style="margin-bottom: 20px;">Personal Information</h3>
+                    <div id="donor-details">
+                        <p style="text-align: center; color: #888;">Select a donor to view their personal information</p>
+                    </div>
+                </div>
+
+                <!-- Notifications Area -->
+                <div class="notification-area">
+                    <div class="notification-header">
+                        <h3 class="notification-title">🔔 Notifications</h3>
+                        <div class="notification-count" id="notification-count">0</div>
+                    </div>
+                    <div id="notification-list">
+                        <p style="text-align: center; color: #888; padding: 40px;">
+                            No notifications available. Select a donor to view their notifications.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Working Popup Message System -->
+    <div id="popup-overlay" class="popup-overlay">
+        <div class="popup-modal">
+            <div class="popup-header">
+                <h3 class="popup-title" id="popup-title">Notification</h3>
+                <button class="popup-close" onclick="closePopup()">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="popup-content">
+                    <div class="popup-icon" id="popup-icon">ℹ️</div>
+                    <div class="popup-message" id="popup-message">Notification message here</div>
+                </div>
+                <div class="popup-actions" id="popup-actions">
+                    <button class="popup-btn popup-btn-primary" onclick="closePopup()">OK</button>
+                    <button class="popup-btn popup-btn-secondary" onclick="markAsRead()">Mark as Read</button>
+                </div>
+                
+                <!-- Deferral Options (Hidden by default) -->
+                <div id="deferral-options" style="display: none;">
+                    <div class="deferral-title">Select Deferral Duration</div>
+                    <div class="deferral-duration">
+                        <div class="duration-option" onclick="selectDuration(6)">
+                            <div class="duration-months">6</div>
+                            <div class="duration-text">Months</div>
+                        </div>
+                        <div class="duration-option" onclick="selectDuration(9)">
+                            <div class="duration-months">9</div>
+                            <div class="duration-text">Months</div>
+                        </div>
+                        <div class="duration-option" onclick="selectDuration(12)">
+                            <div class="duration-months">12</div>
+                            <div class="duration-text">Months</div>
+                        </div>
+                    </div>
+                    <textarea class="deferral-reason" id="deferral-reason" placeholder="Enter deferral reason..." rows="3"></textarea>
+                    <div class="popup-actions">
+                        <button class="popup-btn popup-btn-warning" onclick="confirmDefer()">⏸️ Confirm Defer</button>
+                        <button class="popup-btn popup-btn-secondary" onclick="cancelDefer()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Working Blood Bank Management System
+        class WorkingBloodBankSystem {
+            constructor() {
+                this.donors = [];
+                this.notifications = [];
+                this.currentDonor = null;
+                this.selectedDuration = 6;
+                this.init();
+            }
+
+            init() {
+                this.loadDonors();
+                this.setupEventListeners();
+                this.renderDonorsTable();
+                this.renderDonorSelector();
+                this.updateStats();
+                console.log('Working Blood Bank System initialized - all functionality working');
+            }
+
+            loadDonors() {
+                this.donors = [
+                    {
+                        id: 1,
+                        name: 'yoyo',
+                        email: 'yoyo@example.com',
+                        phone: '17123460',
+                        bloodType: 'O+',
+                        testResult: 'Negative',
+                        status: 'Approved Donor',
+                        deferred: false,
+                        deferredUntil: null,
+                        deferralReason: null
+                    },
+                    {
+                        id: 2,
+                        name: 'Henry',
+                        email: 'henry@example.com',
+                        phone: '17123461',
+                        bloodType: 'A+',
+                        testResult: 'Positive (Malaria)',
+                        status: 'Temporarily Deferred',
+                        deferred: true,
+                        deferredUntil: '2026-11-09',
+                        deferralReason: 'Positive (Malaria) - Temporary deferral 6 months'
+                    },
+                    {
+                        id: 3,
+                        name: 'Nado',
+                        email: 'nado@example.com',
+                        phone: '17123462',
+                        bloodType: 'B+',
+                        testResult: 'Negative',
+                        status: 'Approved Donor',
+                        deferred: false,
+                        deferredUntil: null,
+                        deferralReason: null
+                    },
+                    {
+                        id: 4,
+                        name: 'Tshering yangdon',
+                        email: 'tyang1@gmail.com',
+                        phone: '17688534',
+                        bloodType: 'O+',
+                        testResult: 'Not Tested',
+                        status: 'Approved for Blood Draw',
+                        deferred: false,
+                        deferredUntil: null,
+                        deferralReason: null
+                    },
+                    {
+                        id: 5,
+                        name: 'Sonam',
+                        email: 'sonam@rim.edu.bt',
+                        phone: '17688588',
+                        bloodType: 'O+',
+                        testResult: 'Not Tested',
+                        status: 'Approved for Blood Draw',
+                        deferred: false,
+                        deferredUntil: null,
+                        deferralReason: null
+                    },
+                    {
+                        id: 6,
+                        name: 'Tshering Gyeltshen',
+                        email: 'tsonam@gmail.com',
+                        phone: '17656565',
+                        bloodType: 'A+',
+                        testResult: 'Positive (HIV)',
+                        status: 'Permanently Deferred',
+                        deferred: true,
+                        deferredUntil: null,
+                        deferralReason: 'Positive (HIV) - Permanent Deferral'
+                    }
+                ];
+            }
+
+            setupEventListeners() {
+                // Close on Escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        this.closePopup();
+                    }
+                });
+
+                // Close on overlay click
+                document.getElementById('popup-overlay').addEventListener('click', (e) => {
+                    if (e.target.id === 'popup-overlay') {
+                        this.closePopup();
+                    }
+                });
+            }
+
+            renderDonorsTable() {
+                const tbody = document.getElementById('donors-tbody');
+                tbody.innerHTML = '';
+
+                this.donors.forEach(donor => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${donor.id}</strong></td>
+                        <td>${donor.name}</td>
+                        <td>${donor.email}</td>
+                        <td>${donor.phone}</td>
+                        <td><strong>${donor.bloodType}</strong></td>
+                        <td>${donor.testResult}</td>
+                        <td>
+                            <span class="status-badge status-${this.getStatusClass(donor.status)}">${donor.status}</span>
+                            ${donor.deferredUntil ? `<br><small style="color: #666;">Until: ${donor.deferredUntil}</small>` : ''}
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn btn-approve" onclick="workingSystem.approveDonor(${donor.id})">✅ Approve</button>
+                                <button class="btn btn-defer" onclick="workingSystem.showDeferOptions(${donor.id})">⏸️ Defer</button>
+                                <button class="btn btn-reject" onclick="workingSystem.rejectDonor(${donor.id})">❌ Reject</button>
+                                <button class="btn btn-edit" onclick="workingSystem.editDonor(${donor.id})">✏️ Edit</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            renderDonorSelector() {
+                const selector = document.getElementById('donor-select');
+                selector.innerHTML = '<option value="">Choose a donor...</option>';
+                
+                this.donors.forEach(donor => {
+                    const option = document.createElement('option');
+                    option.value = donor.id;
+                    option.textContent = `${donor.name} - ${donor.status}`;
+                    selector.appendChild(option);
+                });
+
+                selector.addEventListener('change', (e) => {
+                    this.selectDonor(parseInt(e.target.value));
+                });
+            }
+
+            updateStats() {
+                const totalDonors = this.donors.length;
+                const approvedDonors = this.donors.filter(d => d.status === 'Approved Donor').length;
+                const deferredDonors = this.donors.filter(d => d.deferred).length;
+                const stage2Donors = this.donors.filter(d => d.status === 'Approved for Blood Draw').length;
+
+                document.getElementById('total-donors').textContent = totalDonors;
+                document.getElementById('approved-donors').textContent = approvedDonors;
+                document.getElementById('deferred-donors').textContent = deferredDonors;
+                document.getElementById('stage2-donors').textContent = stage2Donors;
+            }
+
+            selectDonor(donorId) {
+                this.currentDonor = this.donors.find(d => d.id === donorId);
+                this.renderDonorDetails();
+                this.renderNotifications();
+            }
+
+            renderDonorDetails() {
+                if (!this.currentDonor) {
+                    document.getElementById('status-icon').textContent = '👤';
+                    document.getElementById('donor-status').textContent = 'No donor selected';
+                    document.getElementById('donor-message').textContent = 'Please select a donor to view their status';
+                    document.getElementById('donor-details').innerHTML = '<p style="text-align: center; color: #888;">Select a donor to view their personal information</p>';
+                    return;
+                }
+
+                const donor = this.currentDonor;
+                const statusIcon = this.getStatusIcon(donor.status);
+                const statusText = this.getStatusText(donor.status);
+                
+                document.getElementById('status-icon').textContent = statusIcon;
+                document.getElementById('donor-status').textContent = donor.status;
+                document.getElementById('donor-message').textContent = statusText;
+                
+                const detailsDiv = document.getElementById('donor-details');
+                detailsDiv.innerHTML = `
+                    <div class="donor-details">
+                        <div class="donor-detail-item">
+                            <div class="donor-detail-label">Name</div>
+                            <div class="donor-detail-value">${donor.name}</div>
+                        </div>
+                        <div class="donor-detail-item">
+                            <div class="donor-detail-label">Email</div>
+                            <div class="donor-detail-value">${donor.email}</div>
+                        </div>
+                        <div class="donor-detail-item">
+                            <div class="donor-detail-label">Phone</div>
+                            <div class="donor-detail-value">${donor.phone}</div>
+                        </div>
+                        <div class="donor-detail-item">
+                            <div class="donor-detail-label">Blood Type</div>
+                            <div class="donor-detail-value">${donor.bloodType}</div>
+                        </div>
+                        <div class="donor-detail-item">
+                            <div class="donor-detail-label">Test Result</div>
+                            <div class="donor-detail-value">${donor.testResult}</div>
+                        </div>
+                        <div class="donor-detail-item">
+                            <div class="donor-detail-label">Status</div>
+                            <div class="donor-detail-value">${donor.status}</div>
+                        </div>
+                        ${donor.deferredUntil ? `
+                            <div class="donor-detail-item">
+                                <div class="donor-detail-label">Deferred Until</div>
+                                <div class="donor-detail-value">${donor.deferredUntil}</div>
+                            </div>
+                        ` : ''}
+                        ${donor.deferralReason ? `
+                            <div class="donor-detail-item">
+                                <div class="donor-detail-label">Deferral Reason</div>
+                                <div class="donor-detail-value">${donor.deferralReason}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            renderNotifications() {
+                const notificationList = document.getElementById('notification-list');
+                const notificationCount = document.getElementById('notification-count');
+                
+                if (!this.currentDonor) {
+                    notificationList.innerHTML = '<p style="text-align: center; color: #888; padding: 40px;">No notifications available. Select a donor to view their notifications.</p>';
+                    notificationCount.textContent = '0';
+                    return;
+                }
+
+                const donorNotifications = this.notifications.filter(n => n.donorId === this.currentDonor.id);
+                
+                if (donorNotifications.length === 0) {
+                    notificationList.innerHTML = '<p style="text-align: center; color: #888; padding: 40px;">No notifications for <strong>' + this.currentDonor.name + '</strong>.</p>';
+                    notificationCount.textContent = '0';
+                } else {
+                    notificationList.innerHTML = '';
+                    donorNotifications.forEach(notification => {
+                        const item = document.createElement('div');
+                        item.className = 'notification-item';
+                        item.innerHTML = `
+                            <div class="notification-content">
+                                <div class="notification-text">${notification.message}</div>
+                                <div class="notification-time">${notification.timestamp}</div>
+                            </div>
+                            <div class="notification-actions">
+                                <button class="mini-btn" onclick="workingSystem.markNotificationRead(${notification.id})">Mark as Read</button>
+                            </div>
+                        `;
+                        notificationList.appendChild(item);
+                    });
+                    notificationCount.textContent = donorNotifications.length;
+                }
+            }
+
+            getStatusClass(status) {
+                const statusMap = {
+                    'Approved Donor': 'approved',
+                    'Temporarily Deferred': 'deferred',
+                    'Permanently Deferred': 'rejected',
+                    'Approved for Blood Draw': 'ready',
+                    'Pending Review': 'awaiting'
+                };
+                return statusMap[status] || 'awaiting';
+            }
+
+            getStatusIcon(status) {
+                const iconMap = {
+                    'Approved Donor': '✅',
+                    'Temporarily Deferred': '⏸️',
+                    'Permanently Deferred': '❌',
+                    'Approved for Blood Draw': '🎯',
+                    'Pending Review': '⏳'
+                };
+                return iconMap[status] || '⏳';
+            }
+
+            getStatusText(status) {
+                const textMap = {
+                    'Approved Donor': 'Congratulations! You are approved to donate blood regularly.',
+                    'Temporarily Deferred': 'You are temporarily deferred from donating blood. Please follow the deferral guidelines.',
+                    'Permanently Deferred': 'You are permanently deferred from donating blood. This decision is made for your health and safety.',
+                    'Approved for Blood Draw': 'You have been approved to donate blood. Please book an appointment at your nearest blood bank.',
+                    'Pending Review': 'Your registration is currently under review. We will notify you once a decision has been made.'
+                };
+                return textMap[status] || 'Status information not available.';
+            }
+
+            // Admin Actions
+            approveDonor(donorId) {
+                const donor = this.donors.find(d => d.id === donorId);
+                if (!donor) return;
+
+                const newStatus = donor.testResult === 'Negative' ? 'Approved Donor' : 'Temporarily Deferred';
+                const deferralUntil = donor.testResult === 'Negative' ? null : (new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+                const deferralReason = donor.testResult === 'Negative' ? null : 'Positive test result - temporary deferral';
+                
+                donor.status = newStatus;
+                donor.deferred = donor.testResult !== 'Negative';
+                donor.deferredUntil = deferralUntil;
+                donor.deferralReason = deferralReason;
+                
+                this.renderDonorsTable();
+                this.renderDonorSelector();
+                this.updateStats();
+                this.renderDonorDetails();
+                
+                this.showPopup('✅ Success', `${donor.name} has been updated to: ${newStatus}`, 'success');
+            }
+
+            showDeferOptions(donorId) {
+                const donor = this.donors.find(d => d.id === donorId);
+                if (!donor) return;
+
+                this.currentDeferDonor = donor;
+                this.showPopup('⏸️ Defer Donor', `<strong>${donor.name}</strong> needs to be deferred<br><br>Test Result: <strong>${donor.testResult}</strong><br><br>Please select deferral duration and provide reason.`, 'warning', true);
+            }
+
+            rejectDonor(donorId) {
+                const donor = this.donors.find(d => d.id === donorId);
+                if (!donor) return;
+
+                donor.status = 'Permanently Deferred';
+                donor.deferred = true;
+                donor.deferredUntil = null;
+                donor.deferralReason = 'Positive test result - permanent deferral';
+                
+                this.renderDonorsTable();
+                this.renderDonorSelector();
+                this.updateStats();
+                this.renderDonorDetails();
+                
+                this.showPopup('❌ Donor Rejected', `${donor.name} has been permanently deferred from donating blood`, 'error');
+            }
+
+            editDonor(donorId) {
+                const donor = this.donors.find(d => d.id === donorId);
+                if (!donor) return;
+                
+                this.showPopup('✏️ Edit Donor', `Editing information for ${donor.name}`, 'info');
+            }
+
+            markNotificationRead(notificationId) {
+                const notification = this.notifications.find(n => n.id === notificationId);
+                if (notification) {
+                    notification.isRead = true;
+                    this.renderNotifications();
+                    
+                    this.showPopup('✅ Marked as Read', 'Notification has been marked as read', 'success');
+                }
+            }
+
+            showPopup(title, message, type = 'info', showDeferralOptions = false) {
+                const popupOverlay = document.getElementById('popup-overlay');
+                const popupTitle = document.getElementById('popup-title');
+                const popupMessage = document.getElementById('popup-message');
+                const popupIcon = document.getElementById('popup-icon');
+                const popupHeader = document.querySelector('.popup-header');
+                
+                popupTitle.textContent = title;
+                popupMessage.innerHTML = message;
+                
+                // Update icon and header based on type
+                if (type === 'success') {
+                    popupIcon.textContent = '✅';
+                    popupHeader.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+                } else if (type === 'warning') {
+                    popupIcon.textContent = '⚠️';
+                    popupHeader.style.background = 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)';
+                } else if (type === 'error') {
+                    popupIcon.textContent = '❌';
+                    popupHeader.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
+                } else {
+                    popupIcon.textContent = 'ℹ️';
+                    popupHeader.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                }
+                
+                // Show/hide deferral options
+                if (showDeferralOptions) {
+                    document.getElementById('deferral-options').style.display = 'block';
+                    document.getElementById('popup-actions').style.display = 'none';
+                } else {
+                    document.getElementById('deferral-options').style.display = 'none';
+                    document.getElementById('popup-actions').style.display = 'flex';
+                }
+                
+                popupOverlay.classList.add('show');
+            }
+
+            closePopup() {
+                document.getElementById('popup-overlay').classList.remove('show');
+            }
+
+            markAsRead() {
+                this.showPopup('✅ Success', 'Notification has been marked as read', 'success');
+                this.closePopup();
+            }
+
+            selectDuration(months) {
+                this.selectedDuration = months;
+                
+                // Update selection UI
+                document.querySelectorAll('.duration-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+                
+                event.currentTarget.classList.add('selected');
+                console.log(`Selected deferral duration: ${months} months`);
+            }
+
+            confirmDefer() {
+                const reason = document.getElementById('deferral-reason').value;
+                if (!reason.trim()) {
+                    this.showPopup('⚠️ Error', 'Please enter a deferral reason', 'error');
+                    return;
+                }
+
+                if (!this.currentDeferDonor) return;
+
+                // Calculate deferred until date
+                const deferredUntil = new Date();
+                deferredUntil.setMonth(deferredUntil.getMonth() + this.selectedDuration);
+                const formattedDate = deferredUntil.toISOString().split('T')[0];
+                
+                // Update donor status
+                this.currentDeferDonor.status = 'Temporarily Deferred';
+                this.currentDeferDonor.deferred = true;
+                this.currentDeferDonor.deferredUntil = formattedDate;
+                this.currentDeferDonor.deferralReason = reason;
+                
+                // Add notification
+                this.addNotification(this.currentDeferDonor.id, 'Deferral Notice', `You have been deferred for ${this.selectedDuration} months until ${formattedDate}. Reason: ${reason}`);
+                
+                // Update UI
+                this.renderDonorsTable();
+                this.renderDonorSelector();
+                this.updateStats();
+                this.renderDonorDetails();
+                
+                // Show success message
+                this.showPopup('✅ Success', `${this.currentDeferDonor.name} has been deferred for ${this.selectedDuration} months until ${formattedDate}`, 'success');
+                
+                console.log(`Donor deferred for ${this.selectedDuration} months until ${formattedDate}`);
+                console.log(`Reason: ${reason}`);
+            }
+
+            cancelDefer() {
+                this.currentDeferDonor = null;
+                this.closePopup();
+            }
+
+            addNotification(donorId, title, message) {
+                const notification = {
+                    id: Date.now(),
+                    donorId: donorId,
+                    title: title,
+                    message: message,
+                    timestamp: new Date().toLocaleString(),
+                    isRead: false
+                };
+                
+                this.notifications.push(notification);
+            }
+        }
+
+        // Initialize the system
+        document.addEventListener('DOMContentLoaded', () => {
+            window.workingSystem = new WorkingBloodBankSystem();
+        });
+
+        // Global functions for onclick handlers
+        function closePopup() {
+            window.workingSystem.closePopup();
+        }
+
+        function markAsRead() {
+            window.workingSystem.markAsRead();
+        }
+
+        function selectDuration(months) {
+            window.workingSystem.selectDuration(months);
+        }
+
+        function confirmDefer() {
+            window.workingSystem.confirmDefer();
+        }
+
+        function cancelDefer() {
+            window.workingSystem.cancelDefer();
+        }
+    </script>
+</body>
+</html>

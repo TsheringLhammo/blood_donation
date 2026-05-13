@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Bank Inventory & Appointments</title>
+    <style>
+        :root {
+            --bg: #f5efe7;
+            --panel: #fffdf9;
+            --panel-2: #f8f4ee;
+            --ink: #2a2320;
+            --muted: #6d625c;
+            --primary: #7b1020;
+            --primary-2: #9f1d2f;
+            --green: #1f8a5b;
+            --orange: #c27a14;
+            --red: #b42318;
+            --border: rgba(123, 16, 32, 0.15);
+            --shadow: 0 18px 45px rgba(46, 30, 20, 0.12);
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Georgia, 'Times New Roman', serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(159, 29, 47, 0.12), transparent 35%),
+                radial-gradient(circle at bottom right, rgba(31, 138, 91, 0.12), transparent 32%),
+                var(--bg);
+            min-height: 100vh;
+        }
+
+        .shell {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #6d0f1f, #8f1528 55%, #a33a46);
+            color: #fff;
+            border-radius: 24px;
+            padding: 24px 28px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .hero h1 {
+            margin: 0 0 8px;
+            font-size: clamp(1.6rem, 2.3vw, 2.5rem);
+            letter-spacing: 0.02em;
+        }
+
+        .hero p {
+            margin: 0;
+            color: rgba(255,255,255,0.9);
+        }
+
+        .hero-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .chip {
+            border: 1px solid rgba(255,255,255,0.24);
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 999px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.18s ease, background 0.18s ease;
+        }
+
+        .chip:hover { transform: translateY(-1px); background: rgba(255,255,255,0.14); }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+
+        .stat {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .stat .label { color: var(--muted); font-size: 0.92rem; }
+        .stat .value { font-size: 2rem; font-weight: 800; margin-top: 6px; }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.8fr);
+            gap: 18px;
+            align-items: start;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 18px 20px;
+            background: linear-gradient(180deg, #fff, #fbf7f1);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-header h2 {
+            margin: 0;
+            font-size: 1.35rem;
+        }
+
+        .panel-header p {
+            margin: 6px 0 0;
+            color: var(--muted);
+        }
+
+        .panel-body { padding: 18px 20px 22px; }
+
+        .inventory-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 980px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 18px;
+            border: 1px solid var(--border);
+        }
+
+        .inventory-table th,
+        .inventory-table td {
+            padding: 14px 12px;
+            border-bottom: 1px solid rgba(123, 16, 32, 0.1);
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .inventory-table th {
+            position: sticky;
+            top: 0;
+            background: #fff7f1;
+            color: var(--primary);
+            font-size: 0.82rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .inventory-table td:first-child,
+        .inventory-table th:first-child { text-align: left; padding-left: 16px; }
+
+        .blood-type {
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .stock-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 84px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-weight: 800;
+        }
+
+        .healthy { background: rgba(31, 138, 91, 0.12); color: var(--green); }
+        .watch { background: rgba(194, 122, 20, 0.14); color: var(--orange); }
+        .low { background: rgba(180, 35, 24, 0.12); color: var(--red); }
+
+        .btn {
+            border: 0;
+            border-radius: 999px;
+            padding: 10px 16px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .btn:hover { transform: translateY(-1px); }
+        .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 8px 18px rgba(123, 16, 32, 0.22); }
+        .btn-outline { background: transparent; border: 1px solid rgba(123,16,32,0.22); color: var(--primary); }
+        .btn-good { background: var(--green); color: #fff; }
+        .btn-bad { background: var(--red); color: #fff; }
+        .btn-ghost { background: #f0e8df; color: var(--ink); }
+
+        .side-grid {
+            display: grid;
+            gap: 18px;
+        }
+
+        .list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .appointment-card,
+        .completed-card,
+        .missed-card {
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 14px 16px;
+            background: linear-gradient(180deg, #fff, #fffaf5);
+        }
+
+        .appointment-row,
+        .record-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .name-line {
+            font-weight: 800;
+            font-size: 1.02rem;
+        }
+
+        .meta-line {
+            color: var(--muted);
+            margin-top: 4px;
+            font-size: 0.95rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .small {
+            font-size: 0.88rem;
+            padding: 9px 14px;
+        }
+
+        .section-gap { margin-top: 18px; }
+
+        .notice {
+            background: #fff8ee;
+            border: 1px solid rgba(194, 122, 20, 0.2);
+            color: #6a4a10;
+            padding: 12px 14px;
+            border-radius: 14px;
+            margin-bottom: 14px;
+            line-height: 1.45;
+        }
+
+        .empty {
+            padding: 28px 12px;
+            color: var(--muted);
+            text-align: center;
+            font-style: italic;
+        }
+
+        .form-field {
+            display: grid;
+            gap: 7px;
+            margin-bottom: 14px;
+        }
+
+        .form-field label {
+            font-size: 0.9rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .form-field input,
+        .form-field select,
+        .form-field textarea {
+            width: 100%;
+            border: 1px solid rgba(123,16,32,0.18);
+            border-radius: 14px;
+            padding: 12px 14px;
+            font: inherit;
+            background: #fff;
+            color: var(--ink);
+        }
+
+        .form-field input[readonly] {
+            background: #f7f1eb;
+            color: #514740;
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(24, 10, 12, 0.58);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            z-index: 1000;
+        }
+
+        .modal-backdrop.show { display: flex; }
+
+        .modal {
+            width: min(760px, 100%);
+            max-height: min(92vh, 920px);
+            overflow: auto;
+            background: var(--panel);
+            border-radius: 26px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .modal-header {
+            padding: 18px 20px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .modal-subtext {
+            color: var(--muted);
+            margin-top: 6px;
+        }
+
+        .modal-body { padding: 18px 20px 8px; }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 20px 20px;
+            border-top: 1px solid var(--border);
+            background: #fcf8f4;
+        }
+
+        .appointment-modal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .full { grid-column: 1 / -1; }
+
+        .reason-box {
+            border: 1px dashed rgba(123,16,32,0.2);
+            border-radius: 18px;
+            padding: 14px 14px 8px;
+            background: #fff9f5;
+        }
+
+        .reason-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .reason-item input { accent-color: var(--primary); }
+
+        .toast-container {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 1100;
+            display: grid;
+            gap: 10px;
+        }
+
+        .toast {
+            min-width: 320px;
+            max-width: 420px;
+            border-radius: 16px;
+            padding: 14px 16px;
+            background: #fff;
+            box-shadow: var(--shadow);
+            border-left: 5px solid var(--primary);
+        }
+
+        .toast.success { border-left-color: var(--green); }
+        .toast.error { border-left-color: var(--red); }
+        .toast-title { font-weight: 800; margin-bottom: 4px; }
+        .toast-body { color: var(--muted); line-height: 1.4; }
+
+        .status-dot {
+            display: inline-flex;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background: var(--green);
+        }
+
+        .status-dot.low { background: var(--red); }
+        .status-dot.watch { background: var(--orange); }
+
+        @media (max-width: 1100px) {
+            .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .layout { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 720px) {
+            .hero { flex-direction: column; align-items: flex-start; }
+            .hero-actions { justify-content: flex-start; }
+            .stats { grid-template-columns: 1fr; }
+            .appointment-modal-grid { grid-template-columns: 1fr; }
+            .toast { min-width: 0; width: calc(100vw - 32px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="toast-container" id="toast-container"></div>
+
+    <div class="modal-backdrop" id="add-unit-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="add-unit-title">➕ ADD BLOOD UNIT - O+</h3>
+                <div class="modal-subtext" id="add-unit-stock">Current O+ Stock: 0 units</div>
+            </div>
+            <form id="add-unit-form">
+                <div class="modal-body">
+                    <div class="notice">
+                        Record an individual blood unit, track donor attendance, and update inventory in one flow.
+                    </div>
+
+                    <div class="appointment-modal-grid">
+                        <div class="form-field full">
+                            <label for="donation-id">Donation ID (Optional)</label>
+                            <input id="donation-id" type="text" placeholder="Leave blank to add without linking a donation">
+                        </div>
+
+                        <div class="form-field">
+                            <label for="donor-select">Select Donor *</label>
+                            <select id="donor-select" required></select>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="appointment-datetime">Appointment Date & Time</label>
+                            <input id="appointment-datetime" type="datetime-local">
+                        </div>
+
+                        <div class="form-field">
+                            <label for="component-type">Component Type *</label>
+                            <select id="component-type" required>
+                                <option>Whole Blood</option>
+                                <option>Packed Red Cells (PRBC)</option>
+                                <option>Platelets</option>
+                                <option>Fresh Frozen Plasma (FFP)</option>
+                                <option>Cryoprecipitate</option>
+                            </select>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="expiry-date">Expiry Date *</label>
+                            <input id="expiry-date" type="date" readonly>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="blood-group">Blood Group</label>
+                            <input id="blood-group" type="text" readonly>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="status-select">Status</label>
+                            <select id="status-select">
+                                <option>Available</option>
+                                <option>Quarantined</option>
+                                <option>Issued</option>
+                                <option>Expired</option>
+                            </select>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="collection-date">Collection Date</label>
+                            <input id="collection-date" type="date" readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeAddUnitModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">✅ ADD TO INVENTORY</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="no-show-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>⚠️ Confirm No Show</h3>
+                <div class="modal-subtext" id="no-show-details"></div>
+            </div>
+            <form id="no-show-form">
+                <div class="modal-body">
+                    <div class="reason-box">
+                        <div class="form-field full">
+                            <label>Why did the donor not show up?</label>
+                            <label class="reason-item"><input type="radio" name="no-show-reason" value="Busy / Work conflict" checked> Busy / Work conflict</label>
+                            <label class="reason-item"><input type="radio" name="no-show-reason" value="Sick / Medical reason"> Sick / Medical reason</label>
+                            <label class="reason-item"><input type="radio" name="no-show-reason" value="Forgot / Lost track of time"> Forgot / Lost track of time</label>
+                            <label class="reason-item"><input type="radio" name="no-show-reason" value="Transportation issue"> Transportation issue</label>
+                            <label class="reason-item"><input type="radio" name="no-show-reason" value="Other"> Other</label>
+                        </div>
+                        <div class="form-field full">
+                            <label for="no-show-custom">Other Reason</label>
+                            <input id="no-show-custom" type="text" placeholder="Optional: add details if Other is selected">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeNoShowModal()">Cancel</button>
+                    <button type="submit" class="btn btn-bad">✅ Mark as No Show</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="shell">
+        <div class="hero">
+            <div>
+                <h1>Blood Bank Inventory & Appointment Management</h1>
+                <p>Standalone HTML system with filtered donor selection, no-show handling, and localStorage persistence.</p>
+            </div>
+            <div class="hero-actions">
+                <button class="chip" type="button" onclick="seedDemoData()">Load Demo Data</button>
+                <button class="chip" type="button" onclick="resetSystem()">Reset System</button>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="label">Today's Appointments</div>
+                <div class="value" id="stat-appointments">0</div>
+            </div>
+            <div class="stat">
+                <div class="label">Completed Donations</div>
+                <div class="value" id="stat-completed">0</div>
+            </div>
+            <div class="stat">
+                <div class="label">Missed Appointments</div>
+                <div class="value" id="stat-missed">0</div>
+            </div>
+            <div class="stat">
+                <div class="label">Total Inventory Units</div>
+                <div class="value" id="stat-total">0</div>
+            </div>
+        </div>
+
+        <div class="layout">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Inventory Table</h2>
+                    <p>Click <strong>Add Units</strong> to open a filtered donor dropdown for that exact blood group.</p>
+                </div>
+                <div class="panel-body">
+                    <div class="table-wrap">
+                        <table class="inventory-table">
+                            <thead>
+                                <tr>
+                                    <th>Blood Type</th>
+                                    <th>Whole</th>
+                                    <th>PRBC</th>
+                                    <th>Platelets</th>
+                                    <th>Plasma (FFP)</th>
+                                    <th>Total Units</th>
+                                    <th>Stock Level</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="section-gap panel" style="box-shadow:none;">
+                        <div class="panel-header">
+                            <h2>Today's Appointments - <span id="today-label"></span></h2>
+                            <p>Appointments stay visible until staff marks them completed or missed.</p>
+                        </div>
+                        <div class="panel-body">
+                            <div id="appointments-list" class="list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="side-grid">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Completed Donations</h2>
+                        <p>Records move here after staff confirms donation completed.</p>
+                    </div>
+                    <div class="panel-body">
+                        <div id="completed-list" class="list"></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Missed Appointments</h2>
+                        <p>Donors can be rebooked for tomorrow at the same time.</p>
+                    </div>
+                    <div class="panel-body">
+                        <div id="missed-list" class="list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'bloodBankInventorySystemV1';
+        const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+
+        const DEFAULT_DONORS = [
+            { id: 'D001', name: 'Nado', bloodGroup: 'O+', status: 'Approved Donor' },
+            { id: 'D002', name: 'Duba', bloodGroup: 'A+', status: 'Approved Donor' },
+            { id: 'D003', name: 'Sonam Pem', bloodGroup: 'O+', status: 'Approved Donor' },
+            { id: 'D004', name: 'Tshering', bloodGroup: 'A+', status: 'Approved Donor' },
+            { id: 'D005', name: 'Dema', bloodGroup: 'O+', status: 'Approved Donor' },
+            { id: 'D006', name: 'Henry', bloodGroup: 'AB+', status: 'Pending' },
+            { id: 'D007', name: 'Wangmo', bloodGroup: 'B+', status: 'Approved Donor' },
+            { id: 'D008', name: 'Karma', bloodGroup: 'B+', status: 'Approved Donor' },
+            { id: 'D009', name: 'Dema Lhamo', bloodGroup: 'O+', status: 'Approved Donor' }
+        ];
+
+        const DEFAULT_INVENTORY = {
+            'A+': { whole: 9, prbc: 0, platelets: 3, plasma: 4 },
+            'A-': { whole: 3, prbc: 3, platelets: 2, plasma: 2 },
+            'B+': { whole: 4, prbc: 4, platelets: 2, plasma: 3 },
+            'B-': { whole: 2, prbc: 1, platelets: 1, plasma: 1 },
+            'O+': { whole: 9, prbc: 10, platelets: 4, plasma: 5 },
+            'O-': { whole: 2, prbc: 1, platelets: 1, plasma: 0 },
+            'AB+': { whole: 3, prbc: 3, platelets: 2, plasma: 2 },
+            'AB-': { whole: 1, prbc: 2, platelets: 1, plasma: 1 }
+        };
+
+        const DEFAULT_APPOINTMENTS = [
+            { id: 'apt-001', donorId: 'D001', date: todayDateValue(), time: '10:00', status: 'Scheduled', reason: '' },
+            { id: 'apt-002', donorId: 'D002', date: todayDateValue(), time: '11:00', status: 'Scheduled', reason: '' },
+            { id: 'apt-003', donorId: 'D003', date: todayDateValue(), time: '13:00', status: 'Scheduled', reason: '' },
+            { id: 'apt-004', donorId: 'D009', date: todayDateValue(), time: '09:00', status: 'Completed', reason: '' },
+            { id: 'apt-005', donorId: 'D004', date: todayDateValue(), time: '14:00', status: 'Missed', reason: 'Sick / Medical reason' }
+        ];
+
+        let activeBloodGroup = 'O+';
+        let activeNoShowAppointmentId = null;
+
+        function todayDateValue() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function tomorrowDateValue() {
+            const date = new Date();
+            date.setDate(date.getDate() + 1);
+            return date.toISOString().split('T')[0];
+        }
+
+        function formatDateLabel(value) {
+            const date = new Date(value + 'T00:00:00');
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        }
+
+        function formatTime(value) {
+            const [hours, minutes] = value.split(':').map(Number);
+            const suffix = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = ((hours + 11) % 12) + 1;
+            return `${displayHours}:${String(minutes).padStart(2, '0')} ${suffix}`;
+        }
+
+        function cloneDefaultState() {
+            return {
+                donors: DEFAULT_DONORS,
+                inventory: structuredClone(DEFAULT_INVENTORY),
+                appointments: DEFAULT_APPOINTMENTS,
+                completedDonations: [],
+                missedAppointments: [],
+                notifications: []
+            };
+        }
+
+        function loadState() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return cloneDefaultState();
+            try {
+                const parsed = JSON.parse(raw);
+                const normalizedAppointments = (parsed.appointments || []).map(appointment => ({
+                    id: appointment.id || cryptoId(),
+                    reason: appointment.reason || '',
+                    ...appointment
+                }));
+                return {
+                    ...cloneDefaultState(),
+                    ...parsed,
+                    appointments: normalizedAppointments,
+                    inventory: { ...structuredClone(DEFAULT_INVENTORY), ...(parsed.inventory || {}) }
+                };
+            } catch (error) {
+                return cloneDefaultState();
+            }
+        }
+
+        function saveState() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+
+        let state = loadState();
+
+        function donorById(id) {
+            return state.donors.find(donor => donor.id === id);
+        }
+
+        function totalForBloodGroup(bloodGroup) {
+            const bucket = state.inventory[bloodGroup];
+            return bucket.whole + bucket.prbc + bucket.platelets + bucket.plasma;
+        }
+
+        function stockLevel(total) {
+            if (total > 20) return { label: 'Healthy', className: 'healthy' };
+            if (total >= 10) return { label: 'Watch', className: 'watch' };
+            return { label: 'Low', className: 'low' };
+        }
+
+        function setDateInputs() {
+            const today = todayDateValue();
+            document.getElementById('collection-date').value = today;
+            document.getElementById('appointment-datetime').value = `${today}T09:00`;
+            document.getElementById('expiry-date').value = expiryDateValue();
+        }
+
+        function expiryDateValue() {
+            const date = new Date();
+            date.setDate(date.getDate() + 35);
+            return date.toISOString().split('T')[0];
+        }
+
+        function init() {
+            document.getElementById('today-label').textContent = formatDateLabel(todayDateValue());
+            setDateInputs();
+            renderAll();
+            attachEvents();
+        }
+
+        function attachEvents() {
+            document.getElementById('add-unit-form').addEventListener('submit', handleAddUnitSubmit);
+            document.getElementById('no-show-form').addEventListener('submit', handleNoShowSubmit);
+            document.getElementById('donor-select').addEventListener('change', handleDonorSelection);
+        }
+
+        function renderAll() {
+            renderInventoryTable();
+            renderAppointments();
+            renderCompletedDonations();
+            renderMissedAppointments();
+            renderStats();
+            saveState();
+        }
+
+        function renderStats() {
+            const todayAppointments = state.appointments.filter(appointment => appointment.date === todayDateValue() && appointment.status === 'Scheduled').length;
+            const completed = state.completedDonations.filter(item => item.date === todayDateValue()).length;
+            const missed = state.missedAppointments.filter(item => item.date === todayDateValue()).length;
+            const total = BLOOD_GROUPS.reduce((sum, bloodGroup) => sum + totalForBloodGroup(bloodGroup), 0);
+
+            document.getElementById('stat-appointments').textContent = todayAppointments;
+            document.getElementById('stat-completed').textContent = completed;
+            document.getElementById('stat-missed').textContent = missed;
+            document.getElementById('stat-total').textContent = total;
+        }
+
+        function renderInventoryTable() {
+            const body = document.getElementById('inventory-body');
+            body.innerHTML = BLOOD_GROUPS.map(bloodGroup => {
+                const row = state.inventory[bloodGroup];
+                const total = totalForBloodGroup(bloodGroup);
+                const level = stockLevel(total);
+
+                return `
+                    <tr>
+                        <td class="blood-type">${bloodGroup}</td>
+                        <td>${row.whole}</td>
+                        <td>${row.prbc}</td>
+                        <td>${row.platelets}</td>
+                        <td>${row.plasma}</td>
+                        <td><strong>${total}</strong></td>
+                        <td><span class="stock-badge ${level.className}"><span class="status-dot ${level.className === 'healthy' ? '' : level.className}"></span>${level.label}</span></td>
+                        <td><button class="btn btn-primary small" type="button" onclick="openAddUnitModal('${bloodGroup}')">Add Units</button></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function todaysAppointments() {
+            return state.appointments.filter(appointment => appointment.date === todayDateValue() && appointment.status === 'Scheduled');
+        }
+
+        function renderAppointments() {
+            const list = document.getElementById('appointments-list');
+            const items = todaysAppointments();
+
+            if (!items.length) {
+                list.innerHTML = '<div class="empty">No scheduled appointments for today.</div>';
+                return;
+            }
+
+            list.innerHTML = items.map(appointment => {
+                const donor = donorById(appointment.donorId);
+                return `
+                    <div class="appointment-card">
+                        <div class="appointment-row">
+                            <div>
+                                <div class="name-line">#${donor.id} - ${donor.name} [${donor.bloodGroup}] • ${formatTime(appointment.time)}</div>
+                                <div class="meta-line">${formatDateLabel(appointment.date)} • Status: ${appointment.status}</div>
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-good small" type="button" onclick="confirmCompleted('${appointment.id}')">✅ COMPLETED</button>
+                                <button class="btn btn-bad small" type="button" onclick="openNoShowModal('${appointment.id}')">❌ NO SHOW</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderCompletedDonations() {
+            const list = document.getElementById('completed-list');
+            const items = state.completedDonations.filter(item => item.date === todayDateValue());
+
+            if (!items.length) {
+                list.innerHTML = '<div class="empty">No completed donations today.</div>';
+                return;
+            }
+
+            list.innerHTML = items.map(item => `
+                <div class="completed-card">
+                    <div class="record-row">
+                        <div>
+                            <div class="name-line">#${item.donorId} - ${item.donorName} [${item.bloodGroup}]</div>
+                            <div class="meta-line">${formatDateLabel(item.date)} • ${formatTime(item.time)} • ${item.componentType}</div>
+                        </div>
+                        <span class="stock-badge healthy">✅ COMPLETED</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderMissedAppointments() {
+            const list = document.getElementById('missed-list');
+            const items = state.missedAppointments.filter(item => item.date === todayDateValue());
+
+            if (!items.length) {
+                list.innerHTML = '<div class="empty">No missed appointments today.</div>';
+                return;
+            }
+
+            list.innerHTML = items.map(item => `
+                <div class="missed-card">
+                    <div class="record-row">
+                        <div>
+                            <div class="name-line">#${item.donorId} - ${item.donorName} [${item.bloodGroup}]</div>
+                            <div class="meta-line">${formatDateLabel(item.date)} • ${formatTime(item.time)} • Reason: ${item.reason}</div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-outline small" type="button" onclick="rebookAppointment('${item.id}')">📅 Rebook</button>
+                            <button class="btn btn-ghost small" type="button" onclick="removeMissedAppointment('${item.id}')">🗑️ Remove</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openAddUnitModal(bloodGroup) {
+            activeBloodGroup = bloodGroup;
+            document.getElementById('add-unit-title').textContent = `➕ ADD BLOOD UNIT - ${bloodGroup}`;
+            document.getElementById('add-unit-stock').textContent = `Current ${bloodGroup} Stock: ${totalForBloodGroup(bloodGroup)} units`;
+            document.getElementById('blood-group').value = bloodGroup;
+            document.getElementById('donation-id').value = '';
+            document.getElementById('status-select').value = 'Available';
+            document.getElementById('component-type').value = 'Whole Blood';
+            document.getElementById('donor-select').innerHTML = donorOptionsForBloodGroup(bloodGroup);
+            document.getElementById('donor-select').value = '';
+            setDateInputs();
+            handleDonorSelection();
+            document.getElementById('add-unit-modal').classList.add('show');
+        }
+
+        function closeAddUnitModal() {
+            document.getElementById('add-unit-modal').classList.remove('show');
+        }
+
+        function donorOptionsForBloodGroup(bloodGroup) {
+            const approved = state.donors.filter(donor => donor.status === 'Approved Donor' && donor.bloodGroup === bloodGroup);
+            const options = ['<option value="">-- Select approved donor --</option>'];
+            approved.forEach(donor => {
+                options.push(`<option value="${donor.id}">${donor.id} - ${donor.name} [${donor.bloodGroup}]</option>`);
+            });
+            if (approved.length === 0) {
+                options.push('<option value="" disabled>No approved donors for this blood group</option>');
+            }
+            return options.join('');
+        }
+
+        function handleDonorSelection() {
+            const selectedDonorId = document.getElementById('donor-select').value;
+            const donor = donorById(selectedDonorId);
+            const bloodGroupInput = document.getElementById('blood-group');
+            const expiryInput = document.getElementById('expiry-date');
+
+            if (!donor) {
+                bloodGroupInput.value = activeBloodGroup;
+                expiryInput.value = expiryDateValue();
+                return;
+            }
+
+            bloodGroupInput.value = donor.bloodGroup;
+            expiryInput.value = expiryDateValue();
+            document.getElementById('add-unit-stock').textContent = `Current ${donor.bloodGroup} Stock: ${totalForBloodGroup(donor.bloodGroup)} units`;
+        }
+
+        function handleAddUnitSubmit(event) {
+            event.preventDefault();
+
+            const donorId = document.getElementById('donor-select').value;
+            const donor = donorById(donorId);
+            const bloodGroup = document.getElementById('blood-group').value || activeBloodGroup;
+
+            if (!donor) {
+                showToast('error', 'Select donor', 'Please select an approved donor with the matching blood group.');
+                return;
+            }
+
+            if (donor.bloodGroup !== activeBloodGroup) {
+                showToast('error', 'Blood group mismatch', 'The donor must match the blood group row you clicked.');
+                return;
+            }
+
+            const appointmentDateTime = document.getElementById('appointment-datetime').value || `${todayDateValue()}T09:00`;
+            const collectionDate = document.getElementById('collection-date').value || todayDateValue();
+            const componentType = document.getElementById('component-type').value;
+            const status = document.getElementById('status-select').value;
+            const donationId = document.getElementById('donation-id').value.trim();
+
+            state.inventory[bloodGroup].whole += 1;
+
+            const relatedAppointment = state.appointments.find(appointment => appointment.date === appointmentDateTime.split('T')[0] && appointment.time === appointmentDateTime.split('T')[1].slice(0, 5) && appointment.donorId === donor.id);
+            if (relatedAppointment && relatedAppointment.status === 'Scheduled') {
+                relatedAppointment.status = 'Completed';
+                state.completedDonations.push({
+                    id: cryptoId(),
+                    donorId: donor.id,
+                    donorName: donor.name,
+                    bloodGroup,
+                    time: relatedAppointment.time,
+                    date: relatedAppointment.date,
+                    componentType,
+                    donationId: donationId || relatedAppointment.id || ''
+                });
+            }
+
+            state.notifications.unshift({
+                id: cryptoId(),
+                type: 'success',
+                message: `✅ ${donor.name} (${bloodGroup}) added! Total ${bloodGroup}: ${totalForBloodGroup(bloodGroup)}`,
+                date: collectionDate
+            });
+
+            saveState();
+            renderAll();
+            closeAddUnitModal();
+            showToast('success', 'Inventory updated', `✅ ${donor.name} (${bloodGroup}) added! Total ${bloodGroup}: ${totalForBloodGroup(bloodGroup)}`);
+        }
+
+        function confirmCompleted(appointmentId) {
+            const appointment = state.appointments.find(item => item.id === appointmentId);
+            if (!appointment) return;
+            const donor = donorById(appointment.donorId);
+            const yes = confirm(`Confirm donation completed for ${donor.name} [${donor.bloodGroup}]?`);
+            if (!yes) return;
+
+            appointment.status = 'Completed';
+            state.inventory[donor.bloodGroup].whole += 1;
+
+            state.completedDonations.push({
+                id: cryptoId(),
+                donorId: donor.id,
+                donorName: donor.name,
+                bloodGroup: donor.bloodGroup,
+                time: appointment.time,
+                date: appointment.date,
+                componentType: 'Whole Blood',
+                donationId: ''
+            });
+
+            state.notifications.unshift({
+                id: cryptoId(),
+                type: 'success',
+                message: `✅ Thank you ${donor.name}! Your ${donor.bloodGroup} donation is complete. You saved lives!`,
+                date: appointment.date
+            });
+
+            saveState();
+            renderAll();
+            showToast('success', 'Donation completed', `✅ ${donor.name} [${donor.bloodGroup}] completed! +1 added to ${donor.bloodGroup} inventory.`);
+        }
+
+        function openNoShowModal(appointmentId) {
+            activeNoShowAppointmentId = appointmentId;
+            const appointment = state.appointments.find(item => item.id === appointmentId);
+            if (!appointment) return;
+            const donor = donorById(appointment.donorId);
+            document.getElementById('no-show-details').textContent = `Donor: ${donor.id} - ${donor.name} [${donor.bloodGroup}] • Appointment: ${formatDateLabel(appointment.date)} at ${formatTime(appointment.time)}`;
+            document.getElementById('no-show-custom').value = '';
+            document.querySelector('input[name="no-show-reason"][value="Busy / Work conflict"]').checked = true;
+            document.getElementById('no-show-modal').classList.add('show');
+        }
+
+        function closeNoShowModal() {
+            activeNoShowAppointmentId = null;
+            document.getElementById('no-show-modal').classList.remove('show');
+        }
+
+        function handleNoShowSubmit(event) {
+            event.preventDefault();
+            if (!activeNoShowAppointmentId) return;
+
+            const appointment = state.appointments.find(item => item.id === activeNoShowAppointmentId);
+            if (!appointment) return;
+            const donor = donorById(appointment.donorId);
+            const selectedReason = document.querySelector('input[name="no-show-reason"]:checked').value;
+            const customReason = document.getElementById('no-show-custom').value.trim();
+            const reason = selectedReason === 'Other' ? (customReason || 'Other') : selectedReason;
+
+            appointment.status = 'Missed';
+            appointment.reason = reason;
+
+            state.missedAppointments.push({
+                id: cryptoId(),
+                donorId: donor.id,
+                donorName: donor.name,
+                bloodGroup: donor.bloodGroup,
+                time: appointment.time,
+                date: appointment.date,
+                reason
+            });
+
+            state.notifications.unshift({
+                id: cryptoId(),
+                type: 'error',
+                message: `❌ You missed your appointment due to ${reason}. Please rebook another appointment.`,
+                date: appointment.date
+            });
+
+            saveState();
+            renderAll();
+            closeNoShowModal();
+            showToast('error', 'Marked as no show', `${donor.name} was marked as missed. No inventory was added.`);
+        }
+
+        function rebookAppointment(missedRecordId) {
+            const missed = state.missedAppointments.find(item => item.id === missedRecordId);
+            if (!missed) return;
+
+            const tomorrow = tomorrowDateValue();
+            const newAppointment = {
+                id: cryptoId(),
+                donorId: missed.donorId,
+                date: tomorrow,
+                time: missed.time,
+                status: 'Scheduled',
+                reason: ''
+            };
+
+            state.appointments.push(newAppointment);
+            state.notifications.unshift({
+                id: cryptoId(),
+                type: 'success',
+                message: `📅 Your appointment has been rescheduled to tomorrow at ${formatTime(missed.time)}`,
+                date: tomorrow
+            });
+
+            saveState();
+            renderAll();
+            showToast('success', 'Rebooked', `Appointment moved to tomorrow at ${formatTime(missed.time)}.`);
+        }
+
+        function removeMissedAppointment(recordId) {
+            state.missedAppointments = state.missedAppointments.filter(item => item.id !== recordId);
+            saveState();
+            renderAll();
+            showToast('success', 'Removed', 'Missed appointment removed from the list.');
+        }
+
+        function resetSystem() {
+            if (!confirm('Reset the standalone demo data?')) return;
+            localStorage.removeItem(STORAGE_KEY);
+            state = cloneDefaultState();
+            init();
+            showToast('success', 'System reset', 'Demo data has been restored.');
+        }
+
+        function seedDemoData() {
+            state = cloneDefaultState();
+            saveState();
+            renderAll();
+            showToast('success', 'Demo loaded', 'Sample donors, inventory, and appointments are ready.');
+        }
+
+        function cryptoId() {
+            if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+            return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        }
+
+        function showToast(type, title, message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<div class="toast-title">${title}</div><div class="toast-body">${message}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4500);
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+        window.openAddUnitModal = openAddUnitModal;
+        window.closeAddUnitModal = closeAddUnitModal;
+        window.confirmCompleted = confirmCompleted;
+        window.openNoShowModal = openNoShowModal;
+        window.closeNoShowModal = closeNoShowModal;
+        window.rebookAppointment = rebookAppointment;
+        window.removeMissedAppointment = removeMissedAppointment;
+        window.resetSystem = resetSystem;
+        window.seedDemoData = seedDemoData;
+    </script>
+</body>
+</html>

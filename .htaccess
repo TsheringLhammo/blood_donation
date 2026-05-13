@@ -1,0 +1,16 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /blood_donation/
+  RewriteRule ^index\.html$ - [L]
+
+  # Allow backend PHP/API calls to bypass React routing.
+  RewriteCond %{REQUEST_URI} ^/blood_donation/backend/ [NC]
+  RewriteRule ^ - [L]
+
+  # Fallback all non-file, non-directory requests to the built React app.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /blood_donation/build/index.html [L]
+</IfModule>
+
+Options -Indexes

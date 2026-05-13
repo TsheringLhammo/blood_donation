@@ -1,0 +1,9 @@
+RewriteEngine On
+RewriteBase /blood_donation/api/
+
+# Serve existing files from this folder first.
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Fall back to the legacy backend/api folder for all existing endpoints.
+RewriteRule ^(.+)$ ../backend/api/$1 [L,QSA]

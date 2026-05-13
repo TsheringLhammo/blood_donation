@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrated Blood Bank Management System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .system-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .admin-panel {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .donor-panel {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 15px 15px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .panel-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .donor-table {
+            width: 100%;
+            overflow-x: auto;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .donor-table th,
+        .donor-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .donor-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .donor-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-awaiting { background: #fff3cd; color: #856404; }
+        .status-approved { background: #d4edda; color: #155724; }
+        .status-deferred { background: #f8d7da; color: #856404; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-approve { background: #28a745; color: white; }
+        .btn-defer { background: #ffc107; color: #212529; }
+        .btn-reject { background: #dc3545; color: white; }
+        .btn-edit { background: #6c757d; color: white; }
+
+        .notification-area {
+            background: #e8f5e8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            min-height: 200px;
+        }
+
+        .notification-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .notification-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-text {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.5;
+        }
+
+        .notification-time {
+            font-size: 12px;
+            color: #888;
+            white-space: nowrap;
+        }
+
+        .notification-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mini-btn {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            background: #667eea;
+            color: white;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .system-container {
+                grid-template-columns: 1fr;
+                gap: 15px;
+                padding: 15px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .system-container {
+                grid-template-columns: 1fr;
+                gap: 10px;
+                padding: 10px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+                gap: 5px;
+            }
+            
+            .btn {
+                padding: 6px 12px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="system-container">
+        <!-- Admin Panel -->
+        <div class="admin-panel">
+            <div class="panel-header">
+                <h1 class="panel-title">🩸 Admin Dashboard</h1>
+                <div class="panel-subtitle">Blood Bank Management System</div>
+            </div>
+            
+            <!-- Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-donors">0</div>
+                    <div class="stat-label">Total Donors</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="approved-donors">0</div>
+                    <div class="stat-label">Approved</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="deferred-donors">0</div>
+                    <div class="stat-label">Deferred</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="pending-donors">0</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+            </div>
+
+            <!-- Donors Table -->
+            <div class="panel-header" style="margin-top: 30px;">
+                <h2 class="panel-title">Donors Management</h2>
+            </div>
+            
+            <table class="donor-table" id="donors-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Blood Type</th>
+                        <th>Test Result</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="donors-tbody">
+                    <!-- Donors will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+        <!-- Donor Panel -->
+        <div class="donor-panel">
+            <div class="panel-header">
+                <h1 class="panel-title">👤 Donor Dashboard</h1>
+                <div class="panel-subtitle">Your Blood Donation Status</div>
+            </div>
+
+            <!-- Donor Status Card -->
+            <div id="donor-status-card" style="background: white; border-radius: 15px; padding: 30px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">🩸</div>
+                    <h2 id="donor-status" style="margin: 0; color: #667eea;">Loading...</h2>
+                    <p id="donor-message" style="font-size: 16px; color: #555; margin-bottom: 20px;">Please select a donor to view status</p>
+                    <div id="donor-actions" style="display: flex; gap: 10px; justify-content: center;">
+                        <!-- Actions will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Donor Information -->
+            <div class="panel-header">
+                <h2 class="panel-title">Personal Information</h2>
+            </div>
+            
+            <div id="donor-info" style="background: white; border-radius: 15px; padding: 30px;">
+                <div id="donor-details">
+                    <!-- Donor details will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Notifications Area -->
+            <div class="panel-header">
+                <h2 class="panel-title">🔔 Notifications</h2>
+            </div>
+            
+            <div class="notification-area" id="notification-area">
+                <div style="text-align: center; color: #888; padding: 40px;">
+                    No notifications available. Select a donor to view their notifications.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup Message System Container -->
+    <div id="popup-container"></div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <script>
+        // Integrated Blood Bank Management System
+        class BloodBankSystem {
+            constructor() {
+                this.donors = [];
+                this.notifications = [];
+                this.currentDonor = null;
+                this.popupSystem = null;
+                this.init();
+            }
+
+            init() {
+                this.loadFromLocalStorage();
+                this.initializePopupSystem();
+                this.updateUI();
+                this.setupEventListeners();
+            }
+
+            loadFromLocalStorage() {
+                const storedDonors = localStorage.getItem('blood_bank_donors');
+                const storedNotifications = localStorage.getItem('blood_bank_notifications');
+                
+                this.donors = storedDonors ? JSON.parse(storedDonors) : this.getDefaultDonors();
+                this.notifications = storedNotifications ? JSON.parse(storedNotifications) : [];
+                
+                this.saveToLocalStorage();
+            }
+
+            getDefaultDonors() {
+                return [
+                    {
+                        id: 1,
+                        name: 'yoyo',
+                        email: 'yoyo@example.com',
+                        phone: '17123460',
+                        bloodType: 'O+',
+                        testResult: 'Negative',
+                        status: 'Approved Donor',
+                        deferred: false,
+                        deferredUntil: null,
+                        deferralReason: null
+                    },
+                    {
+                        id: 2,
+                        name: 'Henry',
+                        email: 'henry@example.com',
+                        phone: '17123461',
+                        bloodType: 'A+',
+                        testResult: 'Positive (Malaria)',
+                        status: 'Temporarily Deferred',
+                        deferred: true,
+                        deferredUntil: '2026-11-09',
+                        deferralReason: 'Positive (Malaria) - Temporary deferral 6 months'
+                    },
+                    {
+                        id: 3,
+                        name: 'Nado',
+                        email: 'nado@example.com',
+                        phone: '17123462',
+                        bloodType: 'B+',
+                        testResult: 'Negative',
+                        status: 'Approved Donor',
+                        deferred: false,
+                        deferredUntil: null,
+                        deferralReason: null
+                    },
+                    {
+                        id: 4,
+                        name: 'Tshering yangdon',
+                        email: 'tyang1@gmail.com',
+                        phone: '17688534',
+                        bloodType: 'O+',
+                        testResult: 'Not Tested',
+                        status: 'Approved for Blood Draw',
+                        deferred: false,
+                        deferredUntil: null,
+                        deferralReason: null
+                    },
+                    {
+                        id: 5,
+                        name: 'Sonam',
+                        email: 'sonam@rim.edu.bt',
+                        phone: '17688588',
+                        bloodType: 'O+',
+                        testResult: 'Not Tested',
+                        status: 'Approved for Blood Draw',
+                        deferred: false,
+                        deferredUntil: null,
+                        deferralReason: null
+                    },
+                    {
+                        id: 6,
+                        name: 'Tshering Gyeltshen',
+                        email: 'tsonam@gmail.com',
+                        phone: '17656565',
+                        bloodType: 'A+',
+                        testResult: 'Positive (HIV)',
+                        status: 'Permanently Deferred',
+                        deferred: true,
+                        deferredUntil: null,
+                        deferralReason: 'Positive (HIV) - Permanent Deferral'
+                    }
+                ];
+            }
+
+            saveToLocalStorage() {
+                localStorage.setItem('blood_bank_donors', JSON.stringify(this.donors));
+                localStorage.setItem('blood_bank_notifications', JSON.stringify(this.notifications));
+            }
+
+            initializePopupSystem() {
+                // Create popup system if not already initialized
+                if (!window.popupSystem) {
+                    const script = document.createElement('script');
+                    script.src = 'enhanced_popup_system.js';
+                    script.onload = () => {
+                        this.popupSystem = new window.PopupMessageSystem();
+                        console.log('Popup system initialized');
+                    };
+                    document.head.appendChild(script);
+                }
+            }
+
+            setupEventListeners() {
+                // Close popups on Escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        if (window.popupSystem) {
+                            window.popupSystem.closeAll();
+                        }
+                    }
+                });
+            }
+
+            updateUI() {
+                this.renderDonorsTable();
+                this.renderDonorSelector();
+                this.renderStats();
+            }
+
+            renderStats() {
+                const totalDonors = this.donors.length;
+                const approvedDonors = this.donors.filter(d => d.status === 'Approved Donor').length;
+                const deferredDonors = this.donors.filter(d => d.deferred).length;
+                const pendingDonors = this.donors.filter(d => d.status === 'Pending Review' || d.status === 'Approved for Blood Draw').length;
+
+                document.getElementById('total-donors').textContent = totalDonors;
+                document.getElementById('approved-donors').textContent = approvedDonors;
+                document.getElementById('deferred-donors').textContent = deferredDonors;
+                document.getElementById('pending-donors').textContent = pendingDonors;
+            }
+
+            renderDonorsTable() {
+                const tbody = document.getElementById('donors-tbody');
+                tbody.innerHTML = '';
+
+                this.donors.forEach(donor => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${donor.id}</td>
+                        <td>${donor.name}</td>
+                        <td>${donor.email}</td>
+                        <td>${donor.phone}</td>
+                        <td>${donor.bloodType}</td>
+                        <td>${donor.testResult}</td>
+                        <td>
+                            <span class="status-badge status-${this.getStatusClass(donor.status)}">${donor.status}</span>
+                            ${donor.deferredUntil ? `<br><small>Until: ${donor.deferredUntil}</small>` : ''}
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn btn-approve" onclick="bloodBankSystem.approveDonor(${donor.id})">✅ Approve</button>
+                                <button class="btn btn-defer" onclick="bloodBankSystem.deferDonor(${donor.id})">⏸️ Defer</button>
+                                <button class="btn btn-reject" onclick="bloodBankSystem.rejectDonor(${donor.id})">❌ Reject</button>
+                                <button class="btn btn-edit" onclick="bloodBankSystem.editDonor(${donor.id})">✏️ Edit</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            renderDonorSelector() {
+                const selector = document.createElement('select');
+                selector.style.cssText = 'width: 200px; padding: 8px; margin: 10px; border: 1px solid #ddd; border-radius: 4px;';
+                selector.innerHTML = '<option value="">Select Donor</option>';
+                
+                this.donors.forEach(donor => {
+                    const option = document.createElement('option');
+                    option.value = donor.id;
+                    option.textContent = `${donor.name} - ${donor.status}`;
+                    selector.appendChild(option);
+                });
+
+                selector.addEventListener('change', (e) => {
+                    this.selectDonor(parseInt(e.target.value));
+                });
+
+                const statusCard = document.getElementById('donor-status-card');
+                statusCard.innerHTML = `
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <label style="font-weight: 600; margin-bottom: 10px; display: block;">Select Donor:</label>
+                        ${selector.outerHTML}
+                    </div>
+                `;
+            }
+
+            renderDonorDetails(donor) {
+                const statusCard = document.getElementById('donor-status-card');
+                const infoArea = document.getElementById('donor-details');
+                
+                const statusIcon = this.getStatusIcon(donor.status);
+                const statusText = this.getStatusText(donor.status);
+                const actions = this.getDonorActions(donor);
+                
+                statusCard.innerHTML = `
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">${statusIcon}</div>
+                        <h2 id="donor-status" style="margin: 0; color: #667eea;">${donor.status}</h2>
+                        <p id="donor-message" style="font-size: 16px; color: #555; margin-bottom: 20px;">${statusText}</p>
+                        <div id="donor-actions" style="display: flex; gap: 10px; justify-content: center;">
+                            ${actions}
+                        </div>
+                    </div>
+                `;
+
+                infoArea.innerHTML = `
+                    <h3 style="margin-bottom: 15px;">Personal Information</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <strong>Name:</strong><br>${donor.name}
+                        </div>
+                        <div>
+                            <strong>Email:</strong><br>${donor.email}
+                        </div>
+                        <div>
+                            <strong>Phone:</strong><br>${donor.phone}
+                        </div>
+                        <div>
+                            <strong>Blood Type:</strong><br>${donor.bloodType}
+                        </div>
+                        <div>
+                            <strong>Test Result:</strong><br>${donor.testResult}
+                        </div>
+                        <div>
+                            <strong>Status:</strong><br>${donor.status}
+                        </div>
+                        ${donor.deferredUntil ? `<div><strong>Deferred Until:</strong><br>${donor.deferredUntil}</div>` : ''}
+                        ${donor.deferralReason ? `<div><strong>Deferral Reason:</strong><br>${donor.deferralReason}</div>` : ''}
+                    </div>
+                `;
+            }
+
+            renderNotifications() {
+                const notificationArea = document.getElementById('notification-area');
+                
+                if (!this.currentDonor) {
+                    notificationArea.innerHTML = `
+                        <div style="text-align: center; color: #888; padding: 40px;">
+                            No notifications available. Select a donor to view their notifications.
+                        </div>
+                    `;
+                    return;
+                }
+
+                const donorNotifications = this.notifications.filter(n => n.donorId === this.currentDonor.id);
+                
+                if (donorNotifications.length === 0) {
+                    notificationArea.innerHTML = `
+                        <div style="text-align: center; color: #888; padding: 40px;">
+                            No notifications for <strong>${this.currentDonor.name}</strong>.
+                        </div>
+                    `;
+                    return;
+                }
+
+                notificationArea.innerHTML = '';
+                donorNotifications.forEach(notification => {
+                    const item = document.createElement('div');
+                    item.className = 'notification-item';
+                    item.innerHTML = `
+                        <div class="notification-content">
+                            <div class="notification-text">${notification.message}</div>
+                        </div>
+                        <div class="notification-time">${notification.timestamp}</div>
+                        <div class="notification-actions">
+                            <button class="mini-btn" onclick="bloodBankSystem.markNotificationRead(${notification.id})">Mark as Read</button>
+                        </div>
+                    `;
+                    notificationArea.appendChild(item);
+                });
+            }
+
+            selectDonor(donorId) {
+                this.currentDonor = this.donors.find(d => d.id === donorId);
+                this.renderDonorDetails(this.currentDonor);
+                this.renderNotifications();
+                this.checkForUnreadNotifications();
+            }
+
+            checkForUnreadNotifications() {
+                if (!this.currentDonor) return;
+                
+                const unreadNotifications = this.notifications.filter(n => 
+                    n.donorId === this.currentDonor.id && !n.isRead
+                );
+
+                if (unreadNotifications.length > 0) {
+                    // Show the most recent unread notification
+                    const latestUnread = unreadNotifications[unreadNotifications.length - 1];
+                    if (this.popupSystem) {
+                        this.popupSystem.show({
+                            title: latestUnread.title || 'New Notification',
+                            message: latestUnread.message,
+                            type: this.getNotificationType(latestUnread.message),
+                            duration: 5000,
+                            persistent: false
+                        });
+                    }
+                }
+            }
+
+            getStatusClass(status) {
+                const statusMap = {
+                    'Approved Donor': 'approved',
+                    'Temporarily Deferred': 'deferred',
+                    'Permanently Deferred': 'rejected',
+                    'Approved for Blood Draw': 'approved',
+                    'Pending Review': 'awaiting'
+                };
+                return statusMap[status] || 'awaiting';
+            }
+
+            getStatusIcon(status) {
+                const iconMap = {
+                    'Approved Donor': '✅',
+                    'Temporarily Deferred': '⏸️',
+                    'Permanently Deferred': '❌',
+                    'Approved for Blood Draw': '🎯',
+                    'Pending Review': '⏳'
+                };
+                return iconMap[status] || '⏳';
+            }
+
+            getStatusText(status) {
+                const textMap = {
+                    'Approved Donor': 'Congratulations! You are approved to donate blood regularly.',
+                    'Temporarily Deferred': `You are temporarily deferred from donating blood. Please follow the deferral guidelines and contact us if you have questions.`,
+                    'Permanently Deferred': 'You are permanently deferred from donating blood. This decision is made for your health and safety.',
+                    'Approved for Blood Draw': 'You have been approved to donate blood. Please book an appointment at your nearest blood bank.',
+                    'Pending Review': 'Your registration is currently under review. We will notify you once a decision has been made.'
+                };
+                return textMap[status] || 'Status information not available.';
+            }
+
+            getNotificationType(message) {
+                if (message.toLowerCase().includes('approved')) return 'success';
+                if (message.toLowerCase().includes('deferred')) return 'warning';
+                if (message.toLowerCase().includes('rejected')) return 'error';
+                return 'info';
+            }
+
+            getDonorActions(donor) {
+                let actions = '';
+                
+                if (donor.status === 'Approved for Blood Draw') {
+                    actions = `
+                        <button class="btn btn-approve" onclick="bloodBankSystem.bookAppointment(${donor.id})">📖 Book Appointment</button>
+                    `;
+                } else if (donor.status === 'Temporarily Deferred' || donor.status === 'Permanently Deferred') {
+                    actions = `
+                        <button class="btn btn-edit" onclick="bloodBankSystem.contactSupport(${donor.id})">📞 Contact Support</button>
+                    `;
+                } else if (donor.status === 'Pending Review') {
+                    actions = `
+                        <button class="btn btn-edit" onclick="bloodBankSystem.viewDetails(${donor.id})">📋 View Details</button>
+                    `;
+                } else {
+                    actions = `
+                        <button class="btn btn-approve" onclick="bloodBankSystem.bookAppointment(${donor.id})">📖 Book Appointment</button>
+                        <button class="btn btn-edit" onclick="bloodBankSystem.editDonor(${donor.id})">✏️ Edit</button>
+                    `;
+                }
+                
+                return actions;
+            }
+
+            // Admin Actions
+            approveDonor(donorId) {
+                const donor = this.donors.find(d => d.id === donorId);
+                if (!donor) return;
+
+                const newStatus = donor.testResult === 'Negative' ? 'Approved Donor' : 'Temporarily Deferred';
+                const deferralUntil = donor.testResult === 'Negative' ? null : (new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+                const deferralReason = donor.testResult === 'Negative' ? null : 'Positive test result - temporary deferral';
+                
+                donor.status = newStatus;
+                donor.deferred = donor.testResult !== 'Negative';
+                donor.deferredUntil = deferralUntil;
+                donor.deferralReason = deferralReason;
+                
+                this.saveToLocalStorage();
+                this.updateUI();
+                
+                if (this.popupSystem) {
+                    this.popupSystem.showSuccess('Donor Status Updated', `${donor.name} has been updated to: ${newStatus}`);
+                }
+            }
+
+            deferDonor(donorId) {
+                const donor = this.donors.find(d => d.id === donorId);
+                if (!donor) return;
+
+                const deferralUntil = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                
+                donor.status = 'Temporarily Deferred';
+                donor.deferred = true;
+                donor.deferredUntil = deferralUntil;
+                donor.deferralReason = 'Positive test result - temporary deferral 6 months';
+                
+                this.saveToLocalStorage();
+                this.updateUI();
+                
+                if (this.popupSystem) {
+                    this.popupSystem.showWarning('Donor Deferred', `${donor.name} has been temporarily deferred for 6 months`);
+                }
+            }
+
+            rejectDonor(donorId) {
+                const donor = this.donors.find(d => d.id === donorId);
+                if (!donor) return;
+
+                donor.status = 'Permanently Deferred';
+                donor.deferred = true;
+                donor.deferredUntil = null;
+                donor.deferralReason = 'Positive test result - permanent deferral';
+                
+                this.saveToLocalStorage();
+                this.updateUI();
+                
+                if (this.popupSystem) {
+                    this.popupSystem.showError('Donor Rejected', `${donor.name} has been permanently deferred from donating blood`);
+                }
+            }
+
+            editDonor(donorId) {
+                const donor = this.donors.find(d => d.id === donorId);
+                if (!donor) return;
+                
+                if (this.popupSystem) {
+                    this.popupSystem.showInfo('Edit Donor', `Editing information for ${donor.name}`);
+                }
+            }
+
+            bookAppointment(donorId) {
+                if (this.popupSystem) {
+                    this.popupSystem.showSuccess('Appointment Booked', 'Appointment booking feature would open here');
+                }
+            }
+
+            contactSupport(donorId) {
+                if (this.popupSystem) {
+                    this.popupSystem.showInfo('Contact Support', 'Blood Bank Support: +975-12345678\nsupport@bloodbank.bt');
+                }
+            }
+
+            viewDetails(donorId) {
+                if (this.popupSystem) {
+                    this.popupSystem.showInfo('Donor Details', `Viewing detailed information for donor ID: ${donorId}`);
+                }
+            }
+
+            markNotificationRead(notificationId) {
+                const notification = this.notifications.find(n => n.id === notificationId);
+                if (notification) {
+                    notification.isRead = true;
+                    this.saveToLocalStorage();
+                    this.renderNotifications();
+                    
+                    if (this.popupSystem) {
+                        this.popupSystem.showSuccess('Marked as Read', 'Notification has been marked as read');
+                    }
+                }
+            }
+
+            addNotification(donorId, title, message) {
+                const notification = {
+                    id: Date.now(),
+                    donorId: donorId,
+                    title: title,
+                    message: message,
+                    timestamp: new Date().toLocaleString(),
+                    isRead: false
+                };
+                
+                this.notifications.push(notification);
+                this.saveToLocalStorage();
+                this.renderNotifications();
+                
+                if (this.popupSystem) {
+                    this.popupSystem.showSuccess('Notification Sent', `${title} has been sent to the donor`);
+                }
+            }
+        }
+
+        // Initialize the system
+        document.addEventListener('DOMContentLoaded', () => {
+            window.bloodBankSystem = new BloodBankSystem();
+            console.log('Integrated Blood Bank Management System initialized');
+        });
+    </script>
+</body>
+</html>

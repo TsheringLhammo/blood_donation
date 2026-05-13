@@ -1,0 +1,458 @@
+/* ── BLOOD DONATION CAMP PAGE ── */
+
+.camp-page {
+  min-height: 100vh;
+  background: #FDF8F5;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ── HERO ── */
+.camp-hero {
+  background: linear-gradient(135deg, #1B5E36 0%, #2E7D4F 100%);
+  padding: 50px 60px 40px;
+  color: white;
+}
+
+.camp-hero-inner {
+  max-width: 1300px;
+  margin: 0 auto;
+}
+
+.camp-hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  margin-top: 10px;
+}
+
+.camp-hero p {
+  font-size: 16px;
+  opacity: 0.85;
+  font-weight: 300;
+}
+
+.camp-breadcrumb {
+  font-size: 13px;
+  opacity: 0.75;
+  margin-bottom: 10px;
+}
+
+.camp-breadcrumb-link {
+  cursor: pointer;
+  color: white;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.camp-breadcrumb-link:hover { opacity: 1; }
+
+/* ── INFO BAR ── */
+.camp-info-bar {
+  background: white;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: center;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+
+.camp-info-item {
+  padding: 16px 36px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #444;
+  border-right: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.camp-info-item:last-child { border-right: none; }
+
+/* ── CONTAINER ── */
+.camp-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 40px 80px;
+}
+
+.camp-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 32px;
+  align-items: start;
+}
+
+/* ── FORM ── */
+.camp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.camp-section {
+  background: white;
+  border-radius: 16px;
+  padding: 32px 36px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.camp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.camp-section-icon { font-size: 24px; }
+
+.camp-section-header h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.camp-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.camp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.camp-field-full { grid-column: 1 / -1; }
+
+.camp-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  letter-spacing: 0.2px;
+}
+
+.req { color: #C8102E; }
+
+.camp-field input,
+.camp-field select,
+.camp-field textarea {
+  padding: 12px 14px;
+  border: 1.5px solid #E0E0E0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  color: #1A1A1A;
+  background: #FAFAFA;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.camp-field input:focus,
+.camp-field select:focus,
+.camp-field textarea:focus {
+  border-color: #2E7D4F;
+  box-shadow: 0 0 0 3px rgba(46, 125, 79, 0.1);
+  background: white;
+}
+
+.camp-field input.error,
+.camp-field select.error {
+  border-color: #E53935;
+  background: #FFF5F5;
+}
+
+.camp-field input::placeholder { color: #bbb; }
+.camp-field textarea { resize: vertical; min-height: 90px; }
+
+.camp-error {
+  font-size: 12px;
+  color: #E53935;
+  font-weight: 500;
+}
+
+/* ── CHECKBOX ── */
+.camp-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+  color: #444;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.camp-checkbox input[type="checkbox"] {
+  accent-color: #2E7D4F;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 3px;
+  cursor: pointer;
+}
+
+.error-check span { color: #E53935; }
+
+/* ── ACTION BUTTONS ── */
+.camp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 8px;
+  flex-wrap: wrap;
+}
+
+.camp-submit-error {
+  width: 100%;
+  margin: 0;
+  color: #A11414;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.camp-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #C8102E;
+  border: 2px solid #C8102E;
+  padding: 13px 28px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.camp-cancel-btn:hover {
+  background: #C8102E;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(200, 16, 46, 0.3);
+}
+
+.camp-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #1B5E36, #2E7D4F);
+  color: white;
+  padding: 14px 36px;
+  border: none;
+  border-radius: 50px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  box-shadow: 0 6px 24px rgba(46, 125, 79, 0.35);
+  transition: all 0.2s ease;
+}
+
+.camp-submit-btn:hover {
+  background: linear-gradient(135deg, #144d2c, #245f3d);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 32px rgba(46, 125, 79, 0.45);
+}
+
+.camp-submit-btn:active { transform: translateY(0); }
+
+.camp-submit-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 3px 12px rgba(46, 125, 79, 0.2);
+}
+
+/* ── SIDEBAR ── */
+.camp-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky;
+  top: 24px;
+}
+
+.camp-side-card {
+  background: white;
+  border-radius: 16px;
+  padding: 26px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  border-top: 4px solid #2E7D4F;
+}
+
+.camp-side-card h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  margin-bottom: 16px;
+}
+
+.camp-side-card ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.camp-side-card ul li {
+  font-size: 13px;
+  color: #555;
+  padding-left: 18px;
+  position: relative;
+  line-height: 1.5;
+}
+
+.camp-side-card ul li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #2E7D4F;
+  font-weight: 700;
+}
+
+.camp-helpline-card {
+  background: linear-gradient(135deg, #1B5E36, #2E7D4F);
+  border-radius: 16px;
+  padding: 24px;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 6px 24px rgba(46, 125, 79, 0.3);
+}
+
+.camp-helpline-icon { font-size: 30px; flex-shrink: 0; }
+
+.camp-helpline-card p {
+  font-size: 12px;
+  opacity: 0.8;
+  margin: 0;
+}
+
+.camp-helpline-card strong {
+  font-size: 20px;
+  font-family: 'Playfair Display', serif;
+  display: block;
+  margin: 2px 0;
+}
+
+/* ── SUCCESS ── */
+.camp-success-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: #FDF8F5;
+}
+
+.camp-success-card {
+  background: white;
+  border-radius: 24px;
+  padding: 60px 50px;
+  text-align: center;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 12px 50px rgba(0,0,0,0.1);
+  border-top: 6px solid #2E7D4F;
+}
+
+.camp-success-icon {
+  font-size: 72px;
+  margin-bottom: 20px;
+  animation: bounce 1.5s ease infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.camp-success-card h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 30px;
+  color: #1A1A1A;
+  margin-bottom: 14px;
+}
+
+.camp-success-card p {
+  font-size: 15px;
+  color: #666;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.camp-success-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+
+.camp-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #C8102E, #9B0020);
+  color: white;
+  padding: 13px 28px;
+  border-radius: 50px;
+  font-weight: 700;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  box-shadow: 0 6px 20px rgba(200,16,46,0.3);
+  transition: all 0.2s ease;
+}
+
+.camp-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(200,16,46,0.4);
+}
+
+.camp-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #555;
+  padding: 13px 24px;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 14px;
+  border: 2px solid #ddd;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.2s ease;
+}
+
+.camp-btn-ghost:hover {
+  border-color: #2E7D4F;
+  color: #2E7D4F;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .camp-layout { grid-template-columns: 1fr; }
+  .camp-hero { padding: 36px 24px 30px; }
+  .camp-hero h1 { font-size: 28px; }
+  .camp-container { padding: 30px 16px 60px; }
+  .camp-section { padding: 24px 20px; }
+  .camp-grid-2 { grid-template-columns: 1fr; }
+  .camp-field-full { grid-column: 1; }
+  .camp-info-bar { flex-wrap: wrap; }
+  .camp-info-item { width: 50%; border-right: none; border-bottom: 1px solid #eee; justify-content: center; }
+  .camp-actions { flex-direction: column-reverse; }
+  .camp-cancel-btn, .camp-submit-btn { width: 100%; justify-content: center; }
+  .camp-sidebar { position: static; }
+}

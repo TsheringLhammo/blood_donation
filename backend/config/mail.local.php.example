@@ -1,0 +1,14 @@
+<?php
+return [
+    // Gmail SMTP example
+    'BTS_SMTP_HOST' => 'smtp.gmail.com',
+    'BTS_SMTP_PORT' => '587',
+    'BTS_SMTP_ENCRYPTION' => 'tls',
+    'BTS_SMTP_USER' => 'your-gmail@gmail.com',
+    'BTS_SMTP_PASS' => 'your-16-char-gmail-app-password',
+    'BTS_MAIL_FROM' => 'your-gmail@gmail.com',
+    'BTS_MAIL_FROM_NAME' => 'Blood Donation Management System',
+
+    // Default test email recipient
+    'BTS_TEST_NOTIFY_EMAIL' => '11102000153@rim.edu.bt',
+];

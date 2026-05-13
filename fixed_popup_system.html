@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixed Popup Message System - Blood Bank</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .demo-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15);
+            padding: 40px;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .demo-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .demo-header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        .demo-header p {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .demo-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .demo-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .demo-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.2);
+        }
+
+        .demo-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3));
+            transition: left 0.5s ease;
+        }
+
+        .demo-btn:hover::before {
+            left: 100%;
+        }
+
+        /* Enhanced Popup Modal Styles */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            display: none;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .popup-overlay.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .popup-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 0;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.25);
+            animation: slideUpBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .popup-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .popup-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: -2px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 1px;
+        }
+
+        .popup-title {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .popup-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            line-height: 1;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            backdrop-filter: blur(5px);
+        }
+
+        .popup-close:hover {
+            opacity: 1;
+            transform: rotate(90deg) scale(1.1);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .popup-body {
+            padding: 35px;
+            text-align: center;
+        }
+
+        .popup-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+        }
+
+        .popup-icon {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.3);
+            position: relative;
+            animation: pulse 2s infinite;
+        }
+
+        .popup-message {
+            font-size: 18px;
+            color: #333;
+            line-height: 1.6;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        .popup-timestamp {
+            font-size: 14px;
+            color: #888;
+            margin-top: 15px;
+        }
+
+        .popup-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .popup-btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 140px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .popup-btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .popup-btn-secondary {
+            background: #6c757d;
+            color: white;
+            box-shadow: 0 6px 20px rgba(108, 117, 125, 0.3);
+        }
+
+        .popup-btn-warning {
+            background: linear-gradient(135deg, #ffc107, #ff9800);
+            color: white;
+            box-shadow: 0 6px 20px rgba(255, 193, 7, 0.3);
+        }
+
+        .popup-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .popup-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2));
+            transition: left 0.5s ease;
+        }
+
+        .popup-btn:hover::before {
+            left: 100%;
+        }
+
+        /* Deerral Options */
+        .deferral-options {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            border-left: 4px solid #ffc107;
+        }
+
+        .deferral-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .deferral-duration {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .duration-option {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .duration-option:hover {
+            border-color: #ffc107;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 193, 7, 0.2);
+        }
+
+        .duration-option.selected {
+            border-color: #ffc107;
+            background: linear-gradient(135deg, #fff9c4, #ffeaa7);
+            box-shadow: 0 5px 15px rgba(255, 193, 7, 0.3);
+        }
+
+        .duration-months {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .duration-text {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .deferral-reason {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            width: 100%;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .deferral-reason:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUpBounce {
+            0% {
+                opacity: 0;
+                transform: translateY(50px) scale(0.3);
+            }
+            60% {
+                opacity: 1;
+                transform: translateY(-10px) scale(1.05);
+            }
+            80% {
+                transform: translateY(5px) scale(0.95);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .demo-container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .button-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .popup-modal {
+                width: 95%;
+                margin: 10px;
+            }
+            
+            .popup-actions {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .popup-btn {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+            
+            .deferral-duration {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>🎨 Fixed Popup Message System</h1>
+            <p>Beautiful, accessible, and user-friendly notification system with working defer buttons</p>
+        </div>
+
+        <div class="button-grid">
+            <button class="demo-btn" onclick="showSuccessPopup()">
+                ✅ Success Popup
+            </button>
+            <button class="demo-btn" onclick="showWarningPopup()">
+                ⚠️ Warning Popup
+            </button>
+            <button class="demo-btn" onclick="showErrorPopup()">
+                ❌ Error Popup
+            </button>
+            <button class="demo-btn" onclick="showInfoPopup()">
+                ℹ️ Info Popup
+            </button>
+            <button class="demo-btn" onclick="showDeferPopup()">
+                ⏸️ Defer Donor (6 Months)
+            </button>
+            <button class="demo-btn" onclick="showDeferOptionsPopup()">
+                ⏰ Defer with Options
+            </button>
+        </div>
+    </div>
+
+    <!-- Enhanced Popup Modal -->
+    <div id="popup-overlay" class="popup-overlay">
+        <div class="popup-modal">
+            <div class="popup-header">
+                <h3 class="popup-title" id="popup-title">Notification</h3>
+                <button class="popup-close" onclick="closePopup()">&times;</button>
+            </div>
+            <div class="popup-body">
+                <div class="popup-content">
+                    <div class="popup-icon" id="popup-icon">ℹ️</div>
+                    <div class="popup-message" id="popup-message">Notification message here</div>
+                    <div class="popup-timestamp" id="popup-timestamp">Just now</div>
+                </div>
+                <div class="popup-actions" id="popup-actions">
+                    <button class="popup-btn popup-btn-primary" id="popup-action-1" onclick="closePopup()">OK</button>
+                    <button class="popup-btn popup-btn-secondary" id="popup-action-2" onclick="markAsRead()">Mark as Read</button>
+                </div>
+                
+                <!-- Deferral Options (Hidden by default) -->
+                <div id="deferral-options" style="display: none;">
+                    <div class="deferral-title">Select Deferral Duration</div>
+                    <div class="deferral-duration">
+                        <div class="duration-option" onclick="selectDuration(6)">
+                            <div class="duration-months">6</div>
+                            <div class="duration-text">Months</div>
+                        </div>
+                        <div class="duration-option" onclick="selectDuration(9)">
+                            <div class="duration-months">9</div>
+                            <div class="duration-text">Months</div>
+                        </div>
+                        <div class="duration-option" onclick="selectDuration(12)">
+                            <div class="duration-months">12</div>
+                            <div class="duration-text">Months</div>
+                        </div>
+                    </div>
+                    <textarea class="deferral-reason" id="deferral-reason" placeholder="Enter deferral reason..." rows="3"></textarea>
+                    <div class="popup-actions">
+                        <button class="popup-btn popup-btn-warning" onclick="confirmDefer()">⏸️ Confirm Defer</button>
+                        <button class="popup-btn popup-btn-secondary" onclick="cancelDefer()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fixed Popup Message System
+        class FixedPopupSystem {
+            constructor() {
+                this.notifications = [];
+                this.currentPopup = null;
+                this.selectedDuration = 6;
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                // Close on Escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        this.closePopup();
+                    }
+                });
+
+                // Close on overlay click
+                document.getElementById('popup-overlay').addEventListener('click', (e) => {
+                    if (e.target.id === 'popup-overlay') {
+                        this.closePopup();
+                    }
+                });
+            }
+
+            showPopup(options) {
+                const {
+                    title = 'Notification',
+                    message = 'Notification message',
+                    icon = 'ℹ️',
+                    type = 'info',
+                    showDeferralOptions = false
+                } = options;
+
+                // Reset popup
+                this.resetPopup();
+
+                // Update popup content
+                document.getElementById('popup-title').textContent = title;
+                document.getElementById('popup-message').innerHTML = message;
+                document.getElementById('popup-timestamp').textContent = new Date().toLocaleString();
+                
+                // Update icon
+                const iconElement = document.getElementById('popup-icon');
+                iconElement.textContent = icon;
+                
+                // Update header background based on type
+                const headerElement = document.querySelector('.popup-header');
+                if (type === 'success') {
+                    headerElement.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+                } else if (type === 'warning') {
+                    headerElement.style.background = 'linear-gradient(135deg, #ffc107 0%, #ff9800 100%)';
+                } else if (type === 'error') {
+                    headerElement.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
+                } else {
+                    headerElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                }
+                
+                // Show deferral options if needed
+                if (showDeferralOptions) {
+                    document.getElementById('deferral-options').style.display = 'block';
+                    document.getElementById('popup-actions').style.display = 'none';
+                } else {
+                    document.getElementById('deferral-options').style.display = 'none';
+                    document.getElementById('popup-actions').style.display = 'flex';
+                }
+
+                // Show popup
+                document.getElementById('popup-overlay').classList.add('show');
+                this.currentPopup = options;
+            }
+
+            resetPopup() {
+                // Reset to default state
+                document.getElementById('popup-title').textContent = 'Notification';
+                document.getElementById('popup-message').innerHTML = 'Notification message here';
+                document.getElementById('popup-timestamp').textContent = 'Just now';
+                document.getElementById('popup-icon').textContent = 'ℹ️';
+                document.querySelector('.popup-header').style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                document.getElementById('deferral-options').style.display = 'none';
+                document.getElementById('popup-actions').style.display = 'flex';
+                document.getElementById('deferral-reason').value = '';
+                this.selectedDuration = 6;
+                
+                // Reset duration selection
+                document.querySelectorAll('.duration-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+            }
+
+            closePopup() {
+                document.getElementById('popup-overlay').classList.remove('show');
+                this.currentPopup = null;
+            }
+
+            selectDuration(months) {
+                this.selectedDuration = months;
+                
+                // Update selection UI
+                document.querySelectorAll('.duration-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+                
+                event.currentTarget.classList.add('selected');
+                console.log(`Selected deferral duration: ${months} months`);
+            }
+
+            confirmDefer() {
+                const reason = document.getElementById('deferral-reason').value;
+                if (!reason.trim()) {
+                    this.showPopup({
+                        title: '⚠️ Error',
+                        message: 'Please enter a deferral reason',
+                        type: 'error'
+                    });
+                    return;
+                }
+
+                // Calculate deferred until date
+                const deferredUntil = new Date();
+                deferredUntil.setMonth(deferredUntil.getMonth() + this.selectedDuration);
+                
+                const formattedDate = deferredUntil.toISOString().split('T')[0];
+                
+                this.showPopup({
+                    title: '✅ Success',
+                    message: `Donor has been deferred for <strong>${this.selectedDuration} months</strong><br><br>Until: <strong>${formattedDate}</strong><br><br>Reason: ${reason}`,
+                    type: 'success'
+                });
+                
+                console.log(`Donor deferred for ${this.selectedDuration} months until ${formattedDate}`);
+                console.log(`Reason: ${reason}`);
+            }
+
+            cancelDefer() {
+                this.closePopup();
+            }
+
+            markAsRead() {
+                this.showPopup({
+                    title: '✅ Success',
+                    message: 'Notification has been marked as read',
+                    type: 'success'
+                });
+            }
+
+            // Predefined notification types
+            showSuccess(title, message) {
+                this.showPopup({
+                    title,
+                    message,
+                    icon: '✅',
+                    type: 'success'
+                });
+            }
+
+            showWarning(title, message) {
+                this.showPopup({
+                    title,
+                    message,
+                    icon: '⚠️',
+                    type: 'warning'
+                });
+            }
+
+            showError(title, message) {
+                this.showPopup({
+                    title,
+                    message,
+                    icon: '❌',
+                    type: 'error'
+                });
+            }
+
+            showInfo(title, message) {
+                this.showPopup({
+                    title,
+                    message,
+                    icon: 'ℹ️',
+                    type: 'info'
+                });
+            }
+
+            // Specialized notifications
+            showDeferDonor(donorName, testResult) {
+                this.showPopup({
+                    title: '⏸️ Defer Donor',
+                    message: `<strong>${donorName}</strong> needs to be deferred<br><br>Test Result: <strong>${testResult}</strong><br><br>Please select deferral duration and provide reason.`,
+                    icon: '⏸️',
+                    type: 'warning',
+                    showDeferralOptions: true
+                });
+            }
+
+            showDeferDonor6Months(donorName, testResult) {
+                this.showPopup({
+                    title: '⏸️ Defer Donor (6 Months)',
+                    message: `<strong>${donorName}</strong> has been deferred for <strong>6 months</strong><br><br>Test Result: <strong>${testResult}</strong><br><br>Reason: Positive test result - requires medical follow-up`,
+                    icon: '⏸️',
+                    type: 'warning'
+                });
+            }
+        }
+
+        // Initialize popup system
+        document.addEventListener('DOMContentLoaded', () => {
+            window.fixedPopupSystem = new FixedPopupSystem();
+            console.log('Fixed Popup Message System initialized');
+        });
+
+        // Demo functions
+        function showSuccessPopup() {
+            window.fixedPopupSystem.showSuccess(
+                'Operation Successful',
+                'Your action has been completed successfully. The system has been updated with the latest information.'
+            );
+        }
+
+        function showWarningPopup() {
+            window.fixedPopupSystem.showWarning(
+                'Attention Required',
+                'Please review this notification carefully. Some action may be required on your part to ensure smooth operation of the blood bank system.'
+            );
+        }
+
+        function showErrorPopup() {
+            window.fixedPopupSystem.showError(
+                'System Error',
+                'An unexpected error occurred while processing your request. Please try again or contact system administrator if the problem persists.'
+            );
+        }
+
+        function showInfoPopup() {
+            window.fixedPopupSystem.showInfo(
+                'System Information',
+                'This is an informational message from the blood bank management system. No action is required at this time.'
+            );
+        }
+
+        function showDeferPopup() {
+            window.fixedPopupSystem.showDeferDonor6Months(
+                'John Doe',
+                'Positive (Malaria)'
+            );
+        }
+
+        function showDeferOptionsPopup() {
+            window.fixedPopupSystem.showDeferDonor(
+                'Jane Smith',
+                'Positive (HIV)'
+            );
+        }
+    </script>
+</body>
+</html>
