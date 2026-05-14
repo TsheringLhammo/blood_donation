@@ -456,3 +456,27 @@
   .camp-cancel-btn, .camp-submit-btn { width: 100%; justify-content: center; }
   .camp-sidebar { position: static; }
 }
+
+.footer-contact {
+  margin: 12px auto 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.footer-contact span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-contact a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.footer-contact a:hover {
+  text-decoration: underline;
+}

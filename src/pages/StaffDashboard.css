@@ -354,6 +354,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); }
   letter-spacing: .5px;
 }
 
+.staff-test-form input,
 .staff-test-form select,
 .staff-test-form textarea {
   width: 100%;
@@ -362,6 +363,111 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); }
   padding: 8px 10px;
   font-size: 12px;
   font-family: 'Inter', sans-serif;
+  background: #fff;
+  color: var(--ink);
+}
+
+.staff-deferral-options {
+  display: grid;
+  gap: 12px;
+}
+
+.staff-deferral-option {
+  display: grid;
+  grid-template-columns: minmax(72px, 88px) 1fr;
+  gap: 16px;
+  padding: 18px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  align-items: center;
+}
+
+.staff-deferral-approve {
+  background: var(--green-light);
+  border-color: var(--green-border);
+}
+
+.staff-deferral-temporary {
+  background: var(--amber-light);
+  border-color: var(--amber-border);
+}
+
+.staff-deferral-permanent {
+  background: var(--red-light);
+  border-color: var(--red-border);
+}
+
+.staff-deferral-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.staff-deferral-control input[type="radio"] {
+  width: 14px;
+  height: 14px;
+  accent-color: currentColor;
+}
+
+.staff-deferral-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  text-align: right;
+}
+
+.staff-deferral-meta select,
+.staff-deferral-meta input[type="text"] {
+  width: 100%;
+  max-width: 320px;
+  min-width: 220px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+.staff-deferral-permanent input[type="text"] {
+  min-width: 320px;
+}
+
+.staff-deferral-meta select {
+  cursor: pointer;
+}
+
+.staff-deferral-meta select option {
+  color: var(--ink);
+}
+
+.staff-deferral-meta select:disabled,
+.staff-deferral-meta input[type="text"]:disabled {
+  opacity: 0.8;
+}
+
+.staff-deferral-meta span {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.staff-deferral-approve .staff-deferral-meta span {
+  color: var(--green);
+}
+
+.staff-deferral-temporary .staff-deferral-meta span {
+  color: var(--amber);
+}
+
+.staff-deferral-permanent .staff-deferral-meta span {
+  color: var(--red);
+}
+
+.staff-deferral-option select:disabled,
+.staff-deferral-option input[type="text"]:disabled {
+  opacity: 0.75;
 }
 
 .staff-test-grid {

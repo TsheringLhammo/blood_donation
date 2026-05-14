@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+/* eslint-disable no-unused-vars */
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Donatingblood.css";
 import { getStoredUser, authFetch } from "../utils/auth";
@@ -157,7 +158,7 @@ export default function DonatingBlood() {
   const [availableBanks, setAvailableBanks] = useState([]);
   const [popupMessage, setPopupMessage] = useState("");
   const [popupRequiresLogin, setPopupRequiresLogin] = useState(false);
-  const [donorProfile, setDonorProfile] = useState(null);
+  const [_donorProfile, setDonorProfile] = useState(null);
   const [isEligibleToBook, setIsEligibleToBook] = useState(false);
   const [bookingIneligibleMessage, setBookingIneligibleMessage] = useState("");
 
@@ -807,6 +808,10 @@ export default function DonatingBlood() {
 
       <footer className="footer">
         <p>© 2026 <strong>National Blood Transfusion Services</strong> · Ministry of Health, Bhutan</p>
+        <p className="footer-contact">
+          <span>📧 <a href="mailto:admin@bts.bt">admin@bts.bt</a></span>
+          <span>📞 <a href="tel:17967631">17967631</a></span>
+        </p>
         <p className="footer-hotline">Helpline: <span>1095</span> · Available 24/7</p>
       </footer>
     </div>

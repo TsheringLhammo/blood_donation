@@ -280,6 +280,30 @@
   font-size: 15px;
 }
 
+.footer-contact {
+  margin: 12px auto 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.footer-contact span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-contact a {
+  color: white;
+  text-decoration: none;
+}
+
+.footer-contact a:hover {
+  text-decoration: underline;
+}
+
 .footer-hotline span {
   color: #E8304A;
   font-weight: 700;

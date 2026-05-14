@@ -746,6 +746,31 @@
   .blood-impact-divider { width: 80px; height: 1px; }
 }
 
+.footer-contact {
+  margin: 12px auto 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.footer-contact span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-contact a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.footer-contact a:hover {
+  text-decoration: underline;
+}
+
+
 @media (max-width: 600px) {
   .blood-groups-grid { grid-template-columns: repeat(4, 1fr); }
   .blood-why-grid { grid-template-columns: 1fr; }

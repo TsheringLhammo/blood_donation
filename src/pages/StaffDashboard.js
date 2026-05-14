@@ -232,7 +232,6 @@ export default function StaffDashboard() {
       return true;
     });
   }, [confirmedDonorOptions]);
-  const sampleEligibleDonors = confirmedDonorOptions.filter((donor) => normalizeDonorSampleState(donor.sample_tested) === "negative");
   const inventoryDonorsForSelectedBloodType = useMemo(() => {
     const selectedBloodType = String(addInventoryModal.bloodType || "").trim();
     if (!selectedBloodType) return [];
@@ -698,7 +697,7 @@ export default function StaffDashboard() {
         comment: "",
       });
     }, 140);
-  }, [incomingRequests, getSelectedUnitForRequest, user]);
+  }, [incomingRequests, getSelectedUnitForRequest, user, closeCrossMatchModal]);
 
   const closeIssueBloodModal = useCallback(() => {
     setIssueBloodModal({
@@ -1751,24 +1750,38 @@ export default function StaffDashboard() {
               <h3>Collect Donor Sample</h3>
               <p>Draw a small sample first. Only donors with a negative sample can later receive a full unit.</p>
               <form className="staff-test-form" onSubmit={handleSampleCollectionSubmit}>
-                <label htmlFor="sample-donor">Donor <span className="required">*</span></label>
-                <select id="sample-donor" value={sampleCollectionForm.donorId || ""} onChange={(e) => handleSampleCollectionChange("donorId", e.target.value)} required>
-                  <option value="">-- Select donor --</option>
-                  {sampleCollectionDonors.map((donor) => (
-                    <option key={`sample-donor-${donor.id}`} value={donor.id}>
-                      {donor.full_name} ({donor.blood_type || "—"}) · Sample: {donor.sample_tested || "Pending"} · ID {donor.id}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <label htmlFor="sample-donor">Pending Sample <span className="required">*</span></label>
+                  <select id="sample-donor" value={sampleCollectionForm.donorId || ""} onChange={(e) => handleSampleCollectionChange("donorId", e.target.value)} required>
+                    <option value="">-- Select donor --</option>
+                    {sampleCollectionDonors.map((donor) => (
+                      <option key={`sample-donor-${donor.id}`} value={donor.id}>
+                        {donor.full_name} ({donor.blood_type || "—"}) · Sample: {donor.sample_tested || "Pending"} · ID {donor.id}
+                      </option>
+                    ))}
+                  </select>
+                  {sampleCollectionDonors.length === 0 && (
+                    <div className="staff-modal-hint" style={{ marginTop: 8 }}>
+                      No pending donor samples were found. Refresh samples or collect a new sample first.
+                    </div>
+                  )}
+                </div>
 
-                <label htmlFor="sample-collection-date">Collection Date <span className="required">*</span></label>
-                <input id="sample-collection-date" type="date" value={sampleCollectionForm.collectionDate} onChange={(e) => handleSampleCollectionChange("collectionDate", e.target.value)} required />
+                <div className="staff-test-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+                  <div>
+                    <label htmlFor="sample-collection-date">Collection Date <span className="required">*</span></label>
+                    <input id="sample-collection-date" type="date" value={sampleCollectionForm.collectionDate} onChange={(e) => handleSampleCollectionChange("collectionDate", e.target.value)} required />
+                  </div>
+                  <div>
+                    <label htmlFor="sample-collection-time">Collection Time <span className="required">*</span></label>
+                    <input id="sample-collection-time" type="time" value={sampleCollectionForm.collectionTime} onChange={(e) => handleSampleCollectionChange("collectionTime", e.target.value)} required />
+                  </div>
+                </div>
 
-                <label htmlFor="sample-collection-time">Collection Time <span className="required">*</span></label>
-                <input id="sample-collection-time" type="time" value={sampleCollectionForm.collectionTime} onChange={(e) => handleSampleCollectionChange("collectionTime", e.target.value)} required />
-
-                <label htmlFor="sample-technician">Technician <span className="required">*</span></label>
-                <input id="sample-technician" type="text" value={sampleCollectionForm.technician} onChange={(e) => handleSampleCollectionChange("technician", e.target.value)} placeholder="Enter technician name" required />
+                <div>
+                  <label htmlFor="sample-technician">Technician <span className="required">*</span></label>
+                  <input id="sample-technician" type="text" value={sampleCollectionForm.technician} onChange={(e) => handleSampleCollectionChange("technician", e.target.value)} placeholder="Enter technician name" required />
+                </div>
 
                 <div className="staff-test-actions">
                   <button type="button" className="staff-table-btn default" onClick={loadSampleRecords} disabled={busyKey !== ""}>
@@ -1785,124 +1798,160 @@ export default function StaffDashboard() {
               <h3>Record Sample Test Results</h3>
               <p>Enter HIV, HBsAg, HCV, Syphilis, and Malaria results for the collected sample.</p>
               <form className="staff-test-form" onSubmit={handleSampleTestSubmit}>
-                <label htmlFor="sample-record">Pending Sample <span className="required">*</span></label>
-                <select id="sample-record" value={sampleTestForm.sampleId || ""} onChange={(e) => handleSampleTestChange("sampleId", e.target.value)} required>
-                  <option value="">-- Select pending sample --</option>
-                  {pendingSampleOptions.map((sample) => (
-                    <option key={`sample-record-${sample.id}`} value={sample.id}>
-                      #{sample.id} · {sample.donor_name} · {sample.collection_date} · {sample.technician}
-                    </option>
-                  ))}
-                </select>
-                {donorSamplesError && (
-                  <div className="staff-modal-hint" style={{ color: '#b45309', marginTop: 8 }}>
-                    {donorSamplesError}
-                  </div>
-                )}
-                {!donorSamplesLoading && pendingSampleRows.length === 0 && !donorSamplesError && (
-                  <div className="staff-modal-hint" style={{ marginTop: 8 }}>
-                    No pending donor samples were found. Refresh samples or collect a new sample first.
-                  </div>
-                )}
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <label htmlFor="sample-record">Pending Sample <span className="required">*</span></label>
+                  <select id="sample-record" value={sampleTestForm.sampleId || ""} onChange={(e) => handleSampleTestChange("sampleId", e.target.value)} required>
+                    <option value="">-- Select pending sample --</option>
+                    {pendingSampleOptions.map((sample) => (
+                      <option key={`sample-record-${sample.id}`} value={sample.id}>
+                        #{sample.id} · {sample.donor_name} · {sample.collection_date} · {sample.technician}
+                      </option>
+                    ))}
+                  </select>
+                  {donorSamplesError && (
+                    <div className="staff-modal-hint" style={{ color: '#b45309', marginTop: 8 }}>
+                      {donorSamplesError}
+                    </div>
+                  )}
+                  {!donorSamplesLoading && pendingSampleRows.length === 0 && !donorSamplesError && (
+                    <div className="staff-modal-hint" style={{ marginTop: 8 }}>
+                      No pending donor samples were found. Refresh samples or collect a new sample first.
+                    </div>
+                  )}
+                </div>
 
-                <label htmlFor="sample-test-technician">Testing Technician <span className="required">*</span></label>
-                <input id="sample-test-technician" type="text" value={sampleTestForm.technician} onChange={(e) => handleSampleTestChange("technician", e.target.value)} placeholder="Enter technician name" required />
+                <div>
+                  <label htmlFor="sample-test-technician">Testing Technician <span className="required">*</span></label>
+                  <input id="sample-test-technician" type="text" value={sampleTestForm.technician} onChange={(e) => handleSampleTestChange("technician", e.target.value)} placeholder="Enter technician name" required />
+                </div>
 
                 <div className="staff-test-form-card" style={{ marginTop: 18 }}>
                   <h4 style={{ fontSize: 14, marginBottom: 10 }}>🩺 MANDATORY HEALTH CHECKS (Required before donation)</h4>
-                  <div style={{ display: 'grid', gap: 10 }}>
-                    {[
-                      { id: 'hemoglobin', label: 'Hemoglobin (g/dL)' },
-                      { id: 'bloodPressure', label: 'Blood Pressure (mmHg)' },
-                      { id: 'pulse', label: 'Pulse (bpm)' },
-                      { id: 'temperature', label: 'Temperature (°C)' },
-                      { id: 'weight', label: 'Weight (kg)' },
-                    ].map((check) => (
-                      <div key={check.id} style={{ display: 'grid', gap: 6 }}>
-                        <label htmlFor={`health-${check.id}`}>{check.label}</label>
-                        <input
-                          id={`health-${check.id}`}
-                          value={healthCheckForm[check.id]}
-                          onChange={(e) => handleHealthCheckChange(check.id, e.target.value)}
-                          placeholder={check.id === 'bloodPressure' ? 'e.g. 120/80' : ''}
-                        />
-                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                          <label style={{ fontSize: 11, color: 'var(--ink-2)', fontWeight: 700 }}>Status</label>
-                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <table className="staff-table" style={{ marginTop: 8 }}>
+                    <thead>
+                      <tr>
+                        <th>Check</th>
+                        <th>Value</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { id: 'hemoglobin', label: 'Hemoglobin (g/dL)' },
+                        { id: 'bloodPressure', label: 'Blood Pressure (mmHg)' },
+                        { id: 'pulse', label: 'Pulse (bpm)' },
+                        { id: 'temperature', label: 'Temperature (°C)' },
+                        { id: 'weight', label: 'Weight (kg)' },
+                      ].map((check) => (
+                        <tr key={check.id}>
+                          <td>{check.label}</td>
+                          <td>
                             <input
-                              type="radio"
-                              name={`health-status-${check.id}`}
-                              value="pass"
-                              checked={healthCheckStatus[check.id] === 'pass'}
-                              onChange={(e) => handleHealthCheckStatusChange(check.id, e.target.value)}
+                              id={`health-${check.id}`}
+                              value={healthCheckForm[check.id]}
+                              onChange={(e) => handleHealthCheckChange(check.id, e.target.value)}
+                              placeholder={check.id === 'bloodPressure' ? 'e.g. 120/80' : ''}
+                              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: 12 }}
                             />
-                            Pass
-                          </label>
-                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            <input
-                              type="radio"
-                              name={`health-status-${check.id}`}
-                              value="fail"
-                              checked={healthCheckStatus[check.id] === 'fail'}
-                              onChange={(e) => handleHealthCheckStatusChange(check.id, e.target.value)}
-                            />
-                            Fail
-                          </label>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <input
+                                  type="radio"
+                                  name={`health-status-${check.id}`}
+                                  value="pass"
+                                  checked={healthCheckStatus[check.id] === 'pass'}
+                                  onChange={(e) => handleHealthCheckStatusChange(check.id, e.target.value)}
+                                />
+                                Pass
+                              </label>
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <input
+                                  type="radio"
+                                  name={`health-status-${check.id}`}
+                                  value="fail"
+                                  checked={healthCheckStatus[check.id] === 'fail'}
+                                  onChange={(e) => handleHealthCheckStatusChange(check.id, e.target.value)}
+                                />
+                                Fail
+                              </label>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
                 <div className="staff-test-form-card" style={{ marginTop: 18 }}>
                   <h4 style={{ fontSize: 14, marginBottom: 10 }}>🧪 LAB TEST RESULTS (Enter each disease and result)</h4>
-                  <div className="staff-test-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
-                    <div>
-                      <label htmlFor="sample-hiv">HIV</label>
-                      <select id="sample-hiv" value={sampleTestForm.hivResult} onChange={(e) => handleSampleTestChange("hivResult", e.target.value)}>
-                        <option value="Non-reactive">Non-reactive</option>
-                        <option value="Reactive">Reactive</option>
-                        <option value="Inconclusive">Inconclusive</option>
-                      </select>
+                  <div style={{ display: 'grid', gap: 16, gridTemplateColumns: '1.2fr 0.8fr' }}>
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      <table className="staff-table" style={{ width: '100%', marginTop: 8 }}>
+                        <thead>
+                          <tr>
+                            <th>Disease / Condition</th>
+                            <th>Result</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>HIV</td>
+                            <td>
+                              <select id="sample-hiv" value={sampleTestForm.hivResult} onChange={(e) => handleSampleTestChange("hivResult", e.target.value)}>
+                                <option value="Non-reactive">Non-reactive</option>
+                                <option value="Reactive">Reactive</option>
+                                <option value="Inconclusive">Inconclusive</option>
+                              </select>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>HBsAg</td>
+                            <td>
+                              <select id="sample-hbsag" value={sampleTestForm.hbsagResult} onChange={(e) => handleSampleTestChange("hbsagResult", e.target.value)}>
+                                <option value="Non-reactive">Non-reactive</option>
+                                <option value="Reactive">Reactive</option>
+                                <option value="Inconclusive">Inconclusive</option>
+                              </select>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>HCV</td>
+                            <td>
+                              <select id="sample-hcv" value={sampleTestForm.hcvResult} onChange={(e) => handleSampleTestChange("hcvResult", e.target.value)}>
+                                <option value="Non-reactive">Non-reactive</option>
+                                <option value="Reactive">Reactive</option>
+                                <option value="Inconclusive">Inconclusive</option>
+                              </select>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>Syphilis</td>
+                            <td>
+                              <select id="sample-syphilis" value={sampleTestForm.syphilisResult} onChange={(e) => handleSampleTestChange("syphilisResult", e.target.value)}>
+                                <option value="Non-reactive">Non-reactive</option>
+                                <option value="Reactive">Reactive</option>
+                                <option value="Inconclusive">Inconclusive</option>
+                              </select>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>Malaria</td>
+                            <td>
+                              <select id="sample-malaria" value={sampleTestForm.malariaResult} onChange={(e) => handleSampleTestChange("malariaResult", e.target.value)}>
+                                <option value="Non-reactive">Non-reactive</option>
+                                <option value="Reactive">Reactive</option>
+                                <option value="Inconclusive">Inconclusive</option>
+                              </select>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
-                    <div>
-                      <label htmlFor="sample-hbsag">HBsAg</label>
-                      <select id="sample-hbsag" value={sampleTestForm.hbsagResult} onChange={(e) => handleSampleTestChange("hbsagResult", e.target.value)}>
-                        <option value="Non-reactive">Non-reactive</option>
-                        <option value="Reactive">Reactive</option>
-                        <option value="Inconclusive">Inconclusive</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="sample-hcv">HCV</label>
-                      <select id="sample-hcv" value={sampleTestForm.hcvResult} onChange={(e) => handleSampleTestChange("hcvResult", e.target.value)}>
-                        <option value="Non-reactive">Non-reactive</option>
-                        <option value="Reactive">Reactive</option>
-                        <option value="Inconclusive">Inconclusive</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="sample-syphilis">Syphilis</label>
-                      <select id="sample-syphilis" value={sampleTestForm.syphilisResult} onChange={(e) => handleSampleTestChange("syphilisResult", e.target.value)}>
-                        <option value="Non-reactive">Non-reactive</option>
-                        <option value="Reactive">Reactive</option>
-                        <option value="Inconclusive">Inconclusive</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="sample-malaria">Malaria</label>
-                      <select id="sample-malaria" value={sampleTestForm.malariaResult} onChange={(e) => handleSampleTestChange("malariaResult", e.target.value)}>
-                        <option value="Non-reactive">Non-reactive</option>
-                        <option value="Reactive">Reactive</option>
-                        <option value="Inconclusive">Inconclusive</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
-                    {extraDiseaseRows.map((row, index) => (
-                      <div key={`extra-disease-${index}`} style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr auto', gap: 10, alignItems: 'end' }}>
-                        <div>
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      {extraDiseaseRows.map((row, index) => (
+                        <div key={`extra-disease-${index}`} style={{ display: 'grid', gap: 8 }}>
                           <label htmlFor={`extra-disease-name-${index}`}>Disease / Condition</label>
                           <input
                             id={`extra-disease-name-${index}`}
@@ -1910,8 +1959,6 @@ export default function StaffDashboard() {
                             onChange={(e) => handleExtraDiseaseChange(index, 'name', e.target.value)}
                             placeholder="Enter disease name"
                           />
-                        </div>
-                        <div>
                           <label htmlFor={`extra-disease-result-${index}`}>Result</label>
                           <select
                             id={`extra-disease-result-${index}`}
@@ -1922,29 +1969,27 @@ export default function StaffDashboard() {
                             <option value="Positive">Positive</option>
                             <option value="Reactive">Reactive</option>
                           </select>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                           {extraDiseaseRows.length > 1 && (
                             <button
                               type="button"
                               className="staff-table-btn default"
-                              style={{ padding: '8px 10px' }}
+                              style={{ padding: '8px 10px', justifySelf: 'start' }}
                               onClick={() => handleRemoveDiseaseRow(index)}
                             >
                               Remove
                             </button>
                           )}
                         </div>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      className="staff-table-btn default"
-                      style={{ width: 'fit-content', marginTop: 8 }}
-                      onClick={handleAddDiseaseRow}
-                    >
-                      + Add More Disease
-                    </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="staff-table-btn default"
+                        style={{ width: 'fit-content', marginTop: 2 }}
+                        onClick={handleAddDiseaseRow}
+                      >
+                        + Add More Disease
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1953,58 +1998,74 @@ export default function StaffDashboard() {
 
                 <div className="staff-test-form-card" style={{ marginTop: 18 }}>
                   <h4 style={{ fontSize: 14, marginBottom: 10 }}>✅ DEFERRAL DECISION (Based on all above checks)</h4>
-                  <div style={{ display: 'grid', gap: 12 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                      <input
-                        type="radio"
-                        name="deferral-decision"
-                        value="approve"
-                        checked={deferralDecision === 'approve'}
-                        onChange={(e) => setDeferralDecision(e.target.value)}
-                      />
-                      APPROVE - Eligible to donate
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                      <input
-                        type="radio"
-                        name="deferral-decision"
-                        value="temporary"
-                        checked={deferralDecision === 'temporary'}
-                        onChange={(e) => setDeferralDecision(e.target.value)}
-                      />
-                      TEMPORARY DEFERRAL - Select period:
-                      <select
-                        value={deferralPeriod}
-                        onChange={(e) => setDeferralPeriod(e.target.value)}
-                        disabled={deferralDecision !== 'temporary'}
-                      >
-                        <option value="3 months">3 months</option>
-                        <option value="6 months">6 months</option>
-                        <option value="12 months">12 months</option>
-                      </select>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                      <input
-                        type="radio"
-                        name="deferral-decision"
-                        value="permanent"
-                        checked={deferralDecision === 'permanent'}
-                        onChange={(e) => setDeferralDecision(e.target.value)}
-                      />
-                      PERMANENT DEFERRAL - Reason:
-                      <input
-                        type="text"
-                        value={deferralReason}
-                        onChange={(e) => setDeferralReason(e.target.value)}
-                        placeholder="Enter reason"
-                        disabled={deferralDecision !== 'permanent'}
-                        style={{ flex: 1 }}
-                      />
-                    </label>
+                  <div className="staff-deferral-options">
+                    <div className="staff-deferral-option staff-deferral-approve">
+                      <div className="staff-deferral-control">
+                        <input
+                          type="radio"
+                          name="deferral-decision"
+                          value="approve"
+                          checked={deferralDecision === 'approve'}
+                          onChange={(e) => setDeferralDecision(e.target.value)}
+                        />
+                      </div>
+                      <div className="staff-deferral-meta">
+                        <span>APPROVE - Eligible to donate</span>
+                      </div>
+                    </div>
+
+                    <div className="staff-deferral-option staff-deferral-temporary">
+                      <div className="staff-deferral-control">
+                        <input
+                          type="radio"
+                          name="deferral-decision"
+                          value="temporary"
+                          checked={deferralDecision === 'temporary'}
+                          onChange={(e) => setDeferralDecision(e.target.value)}
+                        />
+                      </div>
+                      <div className="staff-deferral-meta">
+                        <span>TEMPORARY DEFERRAL - Select period:</span>
+                        <select
+                          value={deferralPeriod}
+                          onChange={(e) => setDeferralPeriod(e.target.value)}
+                          disabled={deferralDecision !== 'temporary'}
+                        >
+                          <option value="3 months">3 months</option>
+                          <option value="6 months">6 months</option>
+                          <option value="12 months">12 months</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="staff-deferral-option staff-deferral-permanent">
+                      <div className="staff-deferral-control">
+                        <input
+                          type="radio"
+                          name="deferral-decision"
+                          value="permanent"
+                          checked={deferralDecision === 'permanent'}
+                          onChange={(e) => setDeferralDecision(e.target.value)}
+                        />
+                      </div>
+                      <div className="staff-deferral-meta">
+                        <span>PERMANENT DEFERRAL - Reason:</span>
+                        <input
+                          type="text"
+                          value={deferralReason}
+                          onChange={(e) => setDeferralReason(e.target.value)}
+                          placeholder="Enter reason for permanent deferral..."
+                          disabled={deferralDecision !== 'permanent'}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <div className="staff-test-actions">
+in 
+                <div className="staff-test-actions" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+                  <button type="button" className="staff-table-btn default">
+                    Cancel
+                  </button>
                   <button
                     type="submit"
                     className="staff-table-btn confirm"

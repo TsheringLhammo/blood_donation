@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom";
 import "./BloodBankList.css";
 
+/* eslint-disable react-hooks/exhaustive-deps */
 const API_URL = process.env.REACT_APP_BLOOD_BANKS_API_URL || "";
 const RAW_GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || process.env.REACT_APP_GOOGLE_MAPS_KEY || "";
 const GOOGLE_MAPS_API_KEY = String(RAW_GOOGLE_MAPS_API_KEY).replace(/^['"]|['"]$/g, "").trim();
@@ -12,6 +13,7 @@ const HAS_GOOGLE_MAPS_KEY = Boolean(
 );
 const BLOOD_TYPES = ["", "A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
 const PAGE_SIZE = 8;
+const SHARED_BANKS_KEY = 'blood_banks_shared_v1';
 
 const FALLBACK_BANKS = [
   {
@@ -412,8 +414,26 @@ function getCandidateApiUrls() {
   return Array.from(urls);
 }
 
+function isCompleteSharedList(sharedList) {
+  if (!Array.isArray(sharedList) || sharedList.length === 0) return false;
+  if (sharedList.length < FALLBACK_BANKS.length) return false;
+
+  const expectedDzongkhags = new Set(FALLBACK_BANKS.map((bank) => bank.dzongkhag));
+  const actualDzongkhags = new Set(
+    sharedList
+      .map((bank) => String(bank.dzongkhag || "").trim())
+      .filter(Boolean)
+  );
+
+  return expectedDzongkhags.size === actualDzongkhags.size &&
+    Array.from(expectedDzongkhags).every((dzongkhag) => actualDzongkhags.has(dzongkhag));
+}
+
 function applyClientFilters(list, search, selectedDzongkhag, selectedType, openNow) {
+  const normalizeType = (value) => String(value || "").trim().toUpperCase();
+  const normalizedType = normalizeType(selectedType);
   const q = search.trim().toLowerCase();
+
   return list.filter((bank) => {
     const matchesSearch =
       !q ||
@@ -422,7 +442,24 @@ function applyClientFilters(list, search, selectedDzongkhag, selectedType, openN
       String(bank.dzongkhag || "").toLowerCase().includes(q);
 
     const matchesDzongkhag = !selectedDzongkhag || bank.dzongkhag === selectedDzongkhag;
-    const matchesType = !selectedType || Number((bank.inventory || {})[selectedType] || 0) > 0;
+    const hasTypeInInventory =
+      normalizedType &&
+      bank.inventory &&
+      typeof bank.inventory === "object" &&
+      Object.keys(bank.inventory).some((key) =>
+        normalizeType(key) === normalizedType && Number(bank.inventory[key] || 0) > 0
+      );
+    const hasTypeInTypes =
+      normalizedType &&
+      (Array.isArray(bank.types)
+        ? bank.types.some((type) => normalizeType(type) === normalizedType)
+        : typeof bank.types === "string"
+        ? String(bank.types)
+            .split(/[,;]+/)
+            .map((type) => normalizeType(type))
+            .includes(normalizedType)
+        : false);
+    const matchesType = !selectedType || hasTypeInInventory || hasTypeInTypes;
     const matchesOpenNow = !openNow || Boolean(bank.is_open_now);
 
     return matchesSearch && matchesDzongkhag && matchesType && matchesOpenNow;
@@ -453,6 +490,39 @@ export default function BloodBanks() {
   }, [banks]);
 
   const fetchBanks = useCallback(async (signal) => {
+    // If a shared localStorage directory is present (from admin UI), prefer it so
+    // public and admin views stay in sync without requiring a backend.
+    try {
+      const raw = window.localStorage.getItem(SHARED_BANKS_KEY);
+      if (raw) {
+        const sharedList = JSON.parse(raw) || [];
+        if (isCompleteSharedList(sharedList)) {
+          const filtered = applyClientFilters(Array.isArray(sharedList) ? sharedList : [], search, selectedDzongkhag, selectedType, openNow)
+            .filter((b) => String(b.status || 'active').toLowerCase() === 'active');
+          setBanks(filtered);
+          setPage((prev) => {
+            const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+            return Math.min(prev, totalPages);
+          });
+          setLoading(false);
+          setError('Showing directory from local admin (shared) data.');
+          return;
+        } else {
+          // Shared data is incomplete; skip API and use full fallback list
+          const fallback = applyClientFilters(FALLBACK_BANKS, search, selectedDzongkhag, selectedType, openNow);
+          setBanks(fallback);
+          setPage((prev) => {
+            const totalPages = Math.max(1, Math.ceil(fallback.length / PAGE_SIZE));
+            return Math.min(prev, totalPages);
+          });
+          setLoading(false);
+          setError('');
+          return;
+        }
+      }
+    } catch (e) {
+      // ignore and fall back to API/fallback lists
+    }
     // Don't attempt fetch if signal is already aborted
     if (signal?.aborted) return;
 
@@ -549,9 +619,32 @@ export default function BloodBanks() {
       fetchBanks(controller.signal).catch(() => {});
     }, 30000);
 
+    // React to shared localStorage changes triggered by Admin UI (and custom dispatch)
+    const onSharedChange = () => {
+      try {
+        const raw = window.localStorage.getItem(SHARED_BANKS_KEY);
+        if (raw) {
+          const list = JSON.parse(raw) || [];
+          if (isCompleteSharedList(list)) {
+            const filtered = applyClientFilters(Array.isArray(list) ? list : [], search, selectedDzongkhag, selectedType, openNow)
+              .filter((b) => String(b.status || 'active').toLowerCase() === 'active');
+            setBanks(filtered);
+            setError('Showing directory from local admin (shared) data.');
+          } else {
+            const fallbackBanks = applyClientFilters(FALLBACK_BANKS, search, selectedDzongkhag, selectedType, openNow);
+            setBanks(fallbackBanks);
+            setError('');
+          }
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('storage', onSharedChange);
+    window.addEventListener('banks-updated', onSharedChange);
     return () => {
       controller.abort();
       clearInterval(poll);
+      window.removeEventListener('storage', onSharedChange);
+      window.removeEventListener('banks-updated', onSharedChange);
     };
   }, [fetchBanks]);
 
@@ -747,9 +840,11 @@ export default function BloodBanks() {
 
             {pagedBanks.map((b) => {
               const inventory = b.inventory || {};
-              const availableTypes = Object.entries(inventory)
-                .filter(([, count]) => Number(count) > 0)
-                .sort((a, b2) => a[0].localeCompare(b2[0]));
+              const typesFromAdmin = Array.isArray(b.types) ? b.types : [];
+              // Prefer explicit types set by admin; otherwise fall back to inventory counts
+              const availableTypes = typesFromAdmin.length > 0
+                ? typesFromAdmin.map((t) => [t, (inventory[t] != null ? inventory[t] : null)])
+                : Object.entries(inventory).filter(([, count]) => Number(count) > 0).sort((a, b2) => a[0].localeCompare(b2[0]));
 
               const appointmentUrl = `/donating-blood?tab=book&bank=${encodeURIComponent(b.name)}`;
 
@@ -783,11 +878,11 @@ export default function BloodBanks() {
                     <span className="bb-types-label">Available Blood Types</span>
                     <div className="bb-types">
                       {availableTypes.length === 0 ? (
-                        <span className="bb-empty-inventory">No available units right now</span>
+                        <span className="bb-empty-inventory">No available blood types listed</span>
                       ) : (
                         availableTypes.map(([type, count]) => (
                           <span key={type} className={`bb-type ${bloodTypeClass[type] || ""}`}>
-                            {type}: {count}
+                            {type}{count != null ? `: ${count}` : ""}
                           </span>
                         ))
                       )}

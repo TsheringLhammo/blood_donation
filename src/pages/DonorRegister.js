@@ -133,6 +133,11 @@ export default function DonorRegister() {
       showPopup("Weak Password", "Password must be at least 6 characters.");
       return;
     }
+    /* eslint-disable-next-line no-useless-escape */
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>\/?]/.test(formData.password)) {
+      showPopup("Weak Password", "Password must contain at least 1 special character (!@#$%^&* etc).");
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       showPopup("Password Mismatch", "Password and confirm password must match.");
       return;
@@ -359,7 +364,7 @@ export default function DonorRegister() {
                 <div className="form-group">
                   <label>Create Password *</label>
                   <input type="password" name="password" value={formData.password}
-                    onChange={handleChange} placeholder="Minimum 6 characters" minLength={6} required />
+                    onChange={handleChange} placeholder="Min 6 chars + 1 special char (!@#$%^&*)" minLength={6} required />
                 </div>
                 <div className="form-group">
                   <label>Confirm Password *</label>

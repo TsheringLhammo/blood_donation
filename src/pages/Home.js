@@ -7,10 +7,53 @@ export default function Home() {
   const navigate = useNavigate();
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [banks, setBanks] = useState([]);
+  const [banksLoading, setBanksLoading] = useState(true);
+
+  // Fetch blood banks from shared localStorage
+  const fetchBanksFromStorage = () => {
+    const sharedKey = 'blood_banks_shared_v1';
+    const storedData = localStorage.getItem(sharedKey);
+    
+    if (storedData) {
+      try {
+        const allBanks = JSON.parse(storedData);
+        const activeBanks = allBanks.filter(b => String(b.status || 'active').toLowerCase() === 'active');
+        console.log('Home.js: Loaded banks from localStorage:', activeBanks);
+        setBanks(activeBanks);
+        setBanksLoading(false);
+        return;
+      } catch(e) {
+        console.error('Home.js: Error parsing stored banks:', e);
+      }
+    }
+    
+    console.log('Home.js: No shared banks found in localStorage');
+    setBanks([]);
+    setBanksLoading(false);
+  };
 
   useEffect(() => {
     const storedUser = getStoredUser();
     setUser(storedUser);
+  }, []);
+
+  // Load banks and setup event listeners
+  useEffect(() => {
+    fetchBanksFromStorage();
+
+    const onSharedChange = () => {
+      console.log('Home.js: Storage event fired, reloading banks');
+      fetchBanksFromStorage();
+    };
+
+    window.addEventListener('storage', onSharedChange);
+    window.addEventListener('banks-updated', onSharedChange);
+
+    return () => {
+      window.removeEventListener('storage', onSharedChange);
+      window.removeEventListener('banks-updated', onSharedChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -233,6 +276,87 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Blood Banks Section */}
+      <section className="blood-banks-section">
+        <div className="blood-banks-header">
+          <div className="section-label">Find Blood Banks</div>
+          <h2 className="section-title">Blood Banks Near You</h2>
+          <p className="section-subtitle">Showing directory from local admin (shared) data.</p>
+        </div>
+
+        {banksLoading ? (
+          <div className="loading-indicator">Loading blood banks...</div>
+        ) : banks.length > 0 ? (
+          <div className="blood-banks-grid">
+            {banks.map((bank, idx) => (
+              <article key={bank.id || idx} className="bank-card">
+                <div className="bank-card-header">
+                  <div className="bank-dzongkhag">{bank.dzongkhag || 'N/A'}</div>
+                  <h3 className="bank-name">{bank.name}</h3>
+                  <p className="bank-subtitle">{bank.name}</p>
+                </div>
+                <div className="bank-card-details">
+                  <div className="detail-row">
+                    <strong>Address:</strong>
+                    <span>{bank.address || 'N/A'}</span>
+                  </div>
+                  <div className="detail-row">
+                    <strong>Phone:</strong>
+                    <span>{bank.phone || 'N/A'}</span>
+                  </div>
+                  <div className="detail-row">
+                    <strong>Hours:</strong>
+                    <span>{bank.hours || 'Mon-Fri: 9:00 AM - 5:00 PM'}</span>
+                  </div>
+                  <div className="detail-row">
+                    <strong>Emergency:</strong>
+                    <span>{bank.emergency_phone || bank.phone || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="bank-services">
+                  {bank.services && bank.services.length > 0 ? (
+                    <>
+                      {bank.services.includes('Blood Donation') && <span className="service-pill">Blood Donation</span>}
+                      {bank.services.includes('Testing') && <span className="service-pill">Testing</span>}
+                    </>
+                  ) : (
+                    <>
+                      <span className="service-pill">Blood Donation</span>
+                      <span className="service-pill">Testing</span>
+                    </>
+                  )}
+                </div>
+                <div className="bank-blood-types">
+                  <div className="blood-types-label">Available Blood Types</div>
+                  <div className="blood-types-grid">
+                    {bank.types && bank.types.length > 0 ? (
+                      bank.types.map((type, typeIdx) => (
+                        <span key={typeIdx} className="blood-type-pill">{type}</span>
+                      ))
+                    ) : (
+                      <span className="blood-type-pill">Not specified</span>
+                    )}
+                  </div>
+                </div>
+                <div className="bank-actions">
+                  <a href={`tel:${bank.phone}`} className="action-link">Call Now</a>
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(bank.name)} ${encodeURIComponent(bank.dzongkhag)}`} className="action-link">Get Directions</a>
+                  <button className="action-link" onClick={() => navigate(`/donating-blood?tab=book&bank=${encodeURIComponent(bank.name)}`)}>Book Appointment</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="no-banks-message">
+            <p>No blood banks available. Please check back soon.</p>
+          </div>
+        )}
+
+        <button className="view-all-btn" onClick={() => navigate("/blood-banks")}>
+          View All Blood Banks <span className="btn-arrow">→</span>
+        </button>
+      </section>
+
       {/* About Blood Section */}
       <section className="blood-info-section">
         <div className="blood-info-header">
@@ -368,6 +492,10 @@ export default function Home() {
 
       <footer className="footer">
         <p>© 2026 <strong>National Blood Transfusion Services</strong> · Ministry of Health, Bhutan</p>
+        <p className="footer-contact">
+          <span>📧 <a href="mailto:admin@bts.bt">admin@bts.bt</a></span>
+          <span>📞 <a href="tel:17967631">17967631</a></span>
+        </p>
         <p className="footer-hotline">Helpline: <span>1095</span> · Available 24/7</p>
       </footer>
 

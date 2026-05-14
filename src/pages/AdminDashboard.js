@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
+/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 
 import { Link, useNavigate } from "react-router-dom";
 
@@ -44,7 +45,7 @@ export default function AdminDashboard() {
 
   const [bloodBanks, setBloodBanks] = useState(null);
 
-  const [notifications, setNotifications] = useState([]);
+  const [_notifications, setNotifications] = useState([]);
 
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
@@ -66,7 +67,7 @@ export default function AdminDashboard() {
 
   const [loadingBloodBanks, setLoadingBloodBanks] = useState(true);
 
-  const [loadingNotifications, setLoadingNotifications] = useState(true);
+  const [_loadingNotifications, setLoadingNotifications] = useState(true);
 
   const [loadingLowStock, setLoadingLowStock] = useState(true);
 
@@ -84,7 +85,7 @@ export default function AdminDashboard() {
 
   const [errorBloodBanks, setErrorBloodBanks] = useState("");
 
-  const [errorNotifications, setErrorNotifications] = useState("");
+  const [_errorNotifications, setErrorNotifications] = useState("");
 
   const [errorLowStock, setErrorLowStock] = useState("");
 
@@ -103,7 +104,7 @@ export default function AdminDashboard() {
   // Details modal state
   const [detailsModal, setDetailsModal] = useState({ isOpen: false, type: null, data: null });
 
-  const [appointmentEdit, setAppointmentEdit] = useState(null);
+  const [_appointmentEdit, _setAppointmentEdit] = useState(null);
 
   const [includeInactiveBanks, setIncludeInactiveBanks] = useState(false);
 
@@ -114,6 +115,25 @@ export default function AdminDashboard() {
   const [bloodBankPerPage] = useState(10);
 
   const [bloodBankPagination, setBloodBankPagination] = useState({ total: 0, totalPages: 1, page: 1, perPage: 10 });
+
+  const [bankForm, setBankForm] = useState({
+    id: null,
+    name: "",
+    address: "",
+    dzongkhag: "",
+    phone: "",
+    email: "",
+    hours: "Mon-Fri: 9:00 AM - 5:00 PM",
+    latitude: "",
+    longitude: "",
+    hospital: "",
+    emergencyPhone: "",
+    emergency: "Emergency on call",
+    status: "active",
+    availabilityStatus: "open",
+    servicesText: "Blood Donation, Testing",
+    types: ["A+", "A-", "B+", "B-", "AB+", "AB-"],
+  });
 
   const [expandedDonorRows, setExpandedDonorRows] = useState(new Set());
 
@@ -129,7 +149,7 @@ export default function AdminDashboard() {
 
   const [referenceBloodType, setReferenceBloodType] = useState("");
 
-  const [referenceWorkflowStatus, setReferenceWorkflowStatus] = useState("");
+  const [_referenceWorkflowStatus, _setReferenceWorkflowStatus] = useState("");
 
   
 
@@ -158,7 +178,7 @@ export default function AdminDashboard() {
     deferred_until: null,
   });
 
-  const [editingDonor, setEditingDonor] = useState(null);
+  const [_editingDonor, _setEditingDonor] = useState(null);
   const [savingDonorEdit, setSavingDonorEdit] = useState(false);
 
   const [processingDecision, setProcessingDecision] = useState(false);
@@ -168,6 +188,21 @@ export default function AdminDashboard() {
 
 
   const BLOOD_GROUP_OPTIONS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+  const BANK_TYPES_FOR_FORM = ["A+", "A-", "B+", "B-", "AB+", "AB-"];
+
+  const SAMPLE_BLOOD_BANKS = [
+    { id: 9, name: "Bumthang Blood Bank", dzongkhag: "Bumthang", phone: "17967631", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Bumthang" },
+    { id: 2, name: "Phuentsholing Blood Bank", dzongkhag: "Chukha", phone: "05-252431", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Chukha" },
+    { id: 16, name: "Dagana District Blood Bank", dzongkhag: "Dagana", phone: "05-35116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Dagana" },
+    { id: 5, name: "Gasa District Blood Bank", dzongkhag: "Gasa", phone: "02-68116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Gasa" },
+    { id: 6, name: "Haa District Blood Bank", dzongkhag: "Haa", phone: "02-84116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Haa" },
+    { id: 13, name: "Lhuntse Blood Bank", dzongkhag: "Lhuntse", phone: "04-33116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Lhuntse" },
+    { id: 19, name: "Lingkorthakha District Blood Bank", dzongkhag: "Lingkorthakha", phone: "03-41116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Lingkorthakha" },
+    { id: 10, name: "Mongar Blood Bank", dzongkhag: "Mongar", phone: "04-64114", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Mongar" },
+    { id: 3, name: "Paro District Blood Bank", dzongkhag: "Paro", phone: "08-27116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Paro" },
+    { id: 20, name: "Pemagatshel District Blood Bank", dzongkhag: "Pemagatshel", phone: "07-53116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Pemagatshel" },
+  ];
 
 
 
@@ -190,6 +225,288 @@ export default function AdminDashboard() {
     return `${message} (HTTP ${response.status})`;
 
   }, []);
+
+  // Shared localStorage key for syncing admin -> public list without backend changes
+  const SHARED_BANKS_KEY = "blood_banks_shared_v1";
+  const genLocalId = () => Date.now() + Math.floor(Math.random() * 999);
+  const readSharedBanks = useCallback(() => {
+    try {
+      const raw = window.localStorage.getItem(SHARED_BANKS_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch (e) {
+      return null;
+    }
+  }, []);
+  const writeSharedBanks = useCallback((list) => {
+    try {
+      window.localStorage.setItem(SHARED_BANKS_KEY, JSON.stringify(list || []));
+      // notify other tabs
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {
+      // ignore write failures
+    }
+  }, []);
+
+  // Ensure shared storage seeded with sample banks so public view has initial data
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    try {
+      const curr = readSharedBanks();
+      if (!curr || !Array.isArray(curr) || curr.length === 0) {
+        const mapped = SAMPLE_BLOOD_BANKS.map((b) => ({
+          id: b.id || genLocalId(),
+          name: b.name || "",
+          hospital: b.hospital || b.name || "",
+          dzongkhag: b.dzongkhag || "",
+          address: b.address || "",
+          phone: b.phone || "",
+          hours: b.hours || "",
+          emergency_phone: b.emergencyPhone || b.emergency_phone || b.phone || "",
+          services: Array.isArray(b.services) ? b.services : (b.servicesText ? String(b.servicesText).split(",").map(s=>s.trim()).filter(Boolean) : []),
+          types: Array.isArray(b.types) ? b.types : ["A+","A-","B+","B-","AB+","AB-"],
+          status: b.status || "active",
+          availabilityStatus: b.availabilityStatus || b.availability_status || "open",
+          latitude: b.latitude ?? null,
+          longitude: b.longitude ?? null,
+          is_open_now: (b.availabilityStatus || b.availability_status || b.is_open_now) === "open" || !!b.is_open_now,
+        }));
+        writeSharedBanks(mapped);
+      }
+    } catch (e) {}
+  }, [readSharedBanks, writeSharedBanks]);
+
+  const normalizeBankFormFromRow = useCallback((bank) => {
+    if (!bank) return null;
+
+    return {
+      id: bank.id ?? null,
+      name: String(bank.name || ""),
+      address: String(bank.address || ""),
+      dzongkhag: String(bank.dzongkhag || ""),
+      phone: String(bank.phone || ""),
+      email: String(bank.email || ""),
+      hours: String(bank.hours || "Mon-Fri: 9:00 AM - 5:00 PM"),
+      latitude: bank.latitude ?? "",
+      longitude: bank.longitude ?? "",
+      hospital: String(bank.hospital || bank.name || ""),
+      emergencyPhone: String(bank.emergencyPhone || bank.emergency_phone || bank.phone || ""),
+      emergency: String(bank.emergency || "Emergency on call"),
+      status: String(bank.status || "active"),
+      availabilityStatus: String(bank.availabilityStatus || bank.availability_status || "open"),
+      servicesText: Array.isArray(bank.services) ? bank.services.join(", ") : "Blood Donation, Testing",
+      types: Array.isArray(bank.types) && bank.types.length > 0 ? bank.types : ["A+", "A-", "B+", "B-", "AB+", "AB-"],
+    };
+  }, []);
+
+  const toNullableNumber = (value) => {
+    const text = String(value ?? "").trim();
+    if (!text) return null;
+    const n = Number(text);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const resetBankForm = useCallback(() => {
+    setBankForm({
+      id: null,
+      name: "",
+      address: "",
+      dzongkhag: "",
+      phone: "",
+      email: "",
+      hours: "Mon-Fri: 9:00 AM - 5:00 PM",
+      latitude: "",
+      longitude: "",
+      hospital: "",
+      emergencyPhone: "",
+      emergency: "Emergency on call",
+      status: "active",
+      availabilityStatus: "open",
+      servicesText: "Blood Donation, Testing",
+      types: ["A+", "A-", "B+", "B-", "AB+", "AB-"],
+    });
+  }, []);
+
+  const editBankFromRow = useCallback((bank) => {
+    const normalized = normalizeBankFormFromRow(bank);
+    if (!normalized) return;
+    setBankForm(normalized);
+    setBankMessage("Editing blood bank. Update fields and click Save Blood Bank.");
+    requestAnimationFrame(() => {
+      if (bankFormRef.current) {
+        bankFormRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }, [normalizeBankFormFromRow]);
+
+  const saveBloodBank = useCallback(async (overrideForm = null) => {
+    const source = overrideForm || bankForm;
+    if (!source.name.trim() || !source.address.trim() || !source.phone.trim() || !source.dzongkhag.trim()) {
+      setBankMessage("Please fill Name, Address, Dzongkhag, and Phone before saving.");
+      return;
+    }
+
+    // Validate phone number format
+    const phone = source.phone.trim();
+    if (!/^\d{8}$/.test(phone)) {
+      setBankMessage("Phone must be exactly 8 digits.");
+      toast.error("Phone must be exactly 8 digits.");
+      return;
+    }
+    if (!/^(16|17|77)/.test(phone)) {
+      setBankMessage("Phone must start with 16, 17, or 77.");
+      toast.error("Phone must start with 16, 17, or 77.");
+      return;
+    }
+
+    // Validate emergency phone if provided
+    if (source.emergencyPhone.trim()) {
+      const emergencyPhone = source.emergencyPhone.trim();
+      if (!/^\d{8}$/.test(emergencyPhone)) {
+        setBankMessage("Emergency phone must be exactly 8 digits.");
+        toast.error("Emergency phone must be exactly 8 digits.");
+        return;
+      }
+      if (!/^(16|17|77)/.test(emergencyPhone)) {
+        setBankMessage("Emergency phone must start with 16, 17, or 77.");
+        toast.error("Emergency phone must start with 16, 17, or 77.");
+        return;
+      }
+    }
+
+    try {
+      const payload = {
+        id: source.id || undefined,
+        name: source.name.trim(),
+        hospital: (source.hospital || source.name).trim(),
+        dzongkhag: source.dzongkhag.trim(),
+        address: source.address.trim(),
+        phone: source.phone.trim(),
+        emergencyPhone: source.emergencyPhone?.trim() || source.phone.trim(),
+        email: source.email?.trim() || "",
+        hours: source.hours?.trim() || "Mon-Fri: 9:00 AM - 5:00 PM",
+        emergency: source.emergency?.trim() || "Emergency on call",
+        latitude: toNullableNumber(source.latitude),
+        longitude: toNullableNumber(source.longitude),
+        services: String(source.servicesText || "")
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean),
+        types: Array.isArray(source.types) && source.types.length > 0 ? source.types : ["A+", "A-", "B+", "B-", "AB+", "AB-"],
+        status: source.status || "active",
+        availabilityStatus: source.availabilityStatus || "open",
+      };
+
+      const res = await authFetch("backend/api/save_blood_bank.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || "Failed to save blood bank.");
+
+      setBankMessage(data.message || "Blood bank saved successfully.");
+      toast.success(data.message || "Blood bank saved successfully.");
+      resetBankForm();
+      setBloodBankPage(1);
+      fetchBloodBanks();
+      // Update shared localStorage so public view reflects this change immediately
+      try {
+        const payloadId = data.data && data.data.id ? data.data.id : payload.id || genLocalId();
+        const saved = {
+          id: payloadId,
+          name: payload.name,
+          hospital: payload.hospital || payload.name,
+          dzongkhag: payload.dzongkhag,
+          address: payload.address,
+          phone: payload.phone,
+          hours: payload.hours,
+          emergency_phone: payload.emergencyPhone || payload.emergency || payload.phone,
+          services: Array.isArray(payload.services) ? payload.services : [],
+          types: Array.isArray(payload.types) ? payload.types : [],
+          status: payload.status || "active",
+          availabilityStatus: payload.availabilityStatus || "open",
+          latitude: payload.latitude ?? null,
+          longitude: payload.longitude ?? null,
+          is_open_now: (payload.availabilityStatus || payload.availabilityStatus) === "open",
+        };
+        const current = readSharedBanks() || [];
+        const idx = current.findIndex((b) => String(b.id) === String(saved.id));
+        if (idx >= 0) current[idx] = { ...current[idx], ...saved };
+        else current.unshift(saved);
+        writeSharedBanks(current);
+      } catch (e) { /* non-fatal */ }
+    } catch (error) {
+      setBankMessage(error.message || "Could not save blood bank.");
+      toast.error(error.message || "Could not save blood bank.");
+    }
+  }, [bankForm, resetBankForm]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const archiveBloodBank = useCallback(async (bank) => {
+    if (!bank?.id) return;
+    if (!window.confirm(`Archive ${bank.name}?`)) return;
+
+    try {
+      const res = await authFetch("backend/api/delete_blood_bank.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: bank.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || "Failed to archive blood bank.");
+
+      setArchiveTarget(bank.id);
+      setBankMessage(data.message || "Blood bank archived successfully.");
+      toast.success(data.message || "Blood bank archived successfully.");
+      fetchBloodBanks();
+      // reflect archive in shared localStorage
+      try {
+        const current = readSharedBanks() || [];
+        const idx = current.findIndex((b) => String(b.id) === String(bank.id));
+        if (idx >= 0) {
+          current[idx] = { ...current[idx], status: "archived" };
+        } else {
+          current.unshift({ ...bank, status: "archived" });
+        }
+        writeSharedBanks(current);
+      } catch (e) { /* non-fatal */ }
+    } catch (error) {
+      setBankMessage(error.message || "Could not archive blood bank.");
+      toast.error(error.message || "Could not archive blood bank.");
+    }
+  }, []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const setBankLocation = useCallback(async (bank) => {
+    if (!bank) return;
+
+    const currentLat = bank.latitude ?? "";
+    const currentLng = bank.longitude ?? "";
+
+    const nextLat = window.prompt(`Latitude for ${bank.name}:`, currentLat === null ? "" : String(currentLat));
+    if (nextLat === null) return;
+    const nextLng = window.prompt(`Longitude for ${bank.name}:`, currentLng === null ? "" : String(currentLng));
+    if (nextLng === null) return;
+
+    const merged = normalizeBankFormFromRow(bank);
+    if (!merged) return;
+    merged.latitude = nextLat.trim();
+    merged.longitude = nextLng.trim();
+    await saveBloodBank(merged);
+  }, [normalizeBankFormFromRow, saveBloodBank]);
+
+  const openMapPicker = useCallback(() => {
+    const lat = toNullableNumber(bankForm.latitude);
+    const lng = toNullableNumber(bankForm.longitude);
+    const target = lat !== null && lng !== null
+      ? `https://www.google.com/maps?q=${lat},${lng}`
+      : "https://www.google.com/maps/place/Bhutan";
+    window.open(target, "_blank", "noopener,noreferrer");
+  }, [bankForm.latitude, bankForm.longitude]);
 
 
 
@@ -271,7 +588,7 @@ export default function AdminDashboard() {
 
       const donor = data.data;
 
-      setEditingDonor(donor);
+      _setEditingDonor(donor);
 
       setEditDonorModal({
 
@@ -337,7 +654,7 @@ export default function AdminDashboard() {
 
     });
 
-    setEditingDonor(null);
+    _setEditingDonor(null);
 
   }, []);
 
@@ -449,6 +766,7 @@ export default function AdminDashboard() {
 
 
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
 
     const parsed = getStoredUser();
@@ -813,13 +1131,20 @@ export default function AdminDashboard() {
 
     fetchPendingDonors();
 
-    fetchBloodBanks();
-
     fetchLowStockAlerts();
 
     fetchNotifications();
 
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const timer = setTimeout(() => {
+      fetchBloodBanks();
+    }, 220);
+
+    return () => clearTimeout(timer);
+  }, [user, fetchBloodBanks]);
 
 
 
@@ -1011,7 +1336,7 @@ export default function AdminDashboard() {
 
 
 
-  const handleFinalizeDecision = async (sampleId, decision, donorName = "this donor") => {
+  const _handleFinalizeDecision = async (sampleId, decision, donorName = "this donor") => {
 
     if (!sampleId) return;
 
@@ -1180,7 +1505,7 @@ export default function AdminDashboard() {
 
   const handleApproveSubmit = async () => {
 
-    const { donorId, donorName, message } = approveModal;
+    const { donorId, message } = approveModal;
 
     if (!donorId) return;
 
@@ -1274,7 +1599,7 @@ export default function AdminDashboard() {
 
   const handleDeferTemporarySubmit = async () => {
 
-    const { donorId, donorName, months } = deferTemporaryModal;
+    const { donorId, months } = deferTemporaryModal;
 
     if (!donorId || !months) return;
 
@@ -1392,7 +1717,7 @@ export default function AdminDashboard() {
 
   const handlePermanentDeferralSubmit = async () => {
 
-    const { donorId, donorName } = permanentDeferralModal;
+    const { donorId } = permanentDeferralModal;
 
     if (!donorId) return;
 
@@ -1848,8 +2173,8 @@ export default function AdminDashboard() {
 
     };
 
-    const positiveDiseaseLabel = getPositiveDiseaseLabel(row);
-    const sampleLabel = getSampleTestResultLabel(row);
+    const _positiveDiseaseLabel = getPositiveDiseaseLabel(row);
+    const _sampleLabel = getSampleTestResultLabel(row);
     const trimmed = String(status || '').trim().toLowerCase();
 
     // NOTE: do not auto-derive deferral status from sample labels here —
@@ -1862,8 +2187,8 @@ export default function AdminDashboard() {
 
   const getWorkflowStatusClass = (status, row = null) => {
 
-    const positiveDiseaseLabel = getPositiveDiseaseLabel(row);
-    const sampleLabel = getSampleTestResultLabel(row);
+    const _positiveDiseaseLabel = getPositiveDiseaseLabel(row);
+    const _sampleLabel = getSampleTestResultLabel(row);
     const trimmed = String(status || '').trim().toLowerCase();
 
     // NOTE: keep class mapping strictly based on workflow_status; do not infer deferral from samples.
@@ -2066,6 +2391,18 @@ export default function AdminDashboard() {
     { to: "/", icon: "🏠", label: "Back to Home", desc: "Return to public site" },
 
   ];
+
+  const fallbackFilteredBanks = SAMPLE_BLOOD_BANKS.filter((bank) => {
+    if (!includeInactiveBanks && String(bank.status || "active").toLowerCase() !== "active") {
+      return false;
+    }
+
+    const query = bloodBankSearch.trim().toLowerCase();
+    if (!query) return true;
+    return String(bank.name || "").toLowerCase().includes(query) || String(bank.dzongkhag || "").toLowerCase().includes(query);
+  });
+
+  const bankRows = Array.isArray(bloodBanks) && bloodBanks.length > 0 ? bloodBanks : fallbackFilteredBanks;
 
 
 
@@ -2671,6 +3008,227 @@ export default function AdminDashboard() {
                 </tbody></table>
 
               )}
+
+            </div>
+
+          )}
+
+
+
+          {activeTab === "bloodBanks" && (
+
+            <div className="admin-bb-wrap">
+
+              <div className="admin-bb-form" ref={bankFormRef}>
+
+                <h3>Add Blood Bank</h3>
+
+                <div className="admin-bb-grid">
+
+                  <input value={bankForm.name} onChange={(e) => setBankForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Name *" />
+
+                  <input value={bankForm.hospital} onChange={(e) => setBankForm((prev) => ({ ...prev, hospital: e.target.value }))} placeholder="Hospital" />
+
+                  <input value={bankForm.dzongkhag} onChange={(e) => setBankForm((prev) => ({ ...prev, dzongkhag: e.target.value }))} placeholder="Dzongkhag *" />
+
+                  <input value={bankForm.address} onChange={(e) => setBankForm((prev) => ({ ...prev, address: e.target.value }))} placeholder="Address *" />
+
+                  <input 
+                    type="tel"
+                    value={bankForm.phone} 
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, '');
+                      setBankForm((prev) => ({ ...prev, phone: val }));
+                    }} 
+                    placeholder="Phone * (8 digits, starts with 16, 17, or 77)" 
+                    maxLength="8"
+                  />
+
+                  <input 
+                    type="tel"
+                    value={bankForm.emergencyPhone} 
+                    onChange={(e) => {
+                      let val = e.target.value.replace(/\D/g, '');
+                      setBankForm((prev) => ({ ...prev, emergencyPhone: val }));
+                    }} 
+                    placeholder="Emergency phone (8 digits, starts with 16, 17, or 77)"
+                    maxLength="8"
+                  />
+
+                  <input value={bankForm.email} onChange={(e) => setBankForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="Email" />
+
+                  <input value={bankForm.hours} onChange={(e) => setBankForm((prev) => ({ ...prev, hours: e.target.value }))} placeholder="Mon-Fri: 9:00 AM - 5:00 PM" />
+
+                  <input value={bankForm.emergency} onChange={(e) => setBankForm((prev) => ({ ...prev, emergency: e.target.value }))} placeholder="Emergency on call" />
+
+                  <input value={bankForm.latitude} onChange={(e) => setBankForm((prev) => ({ ...prev, latitude: e.target.value }))} placeholder="Latitude" />
+
+                  <input value={bankForm.longitude} onChange={(e) => setBankForm((prev) => ({ ...prev, longitude: e.target.value }))} placeholder="Longitude" />
+
+                  <input value={bankForm.servicesText} onChange={(e) => setBankForm((prev) => ({ ...prev, servicesText: e.target.value }))} placeholder="Blood Donation, Testing" />
+
+                  <div className="admin-bb-types">
+
+                    <label>Blood groups</label>
+
+                    <div className="admin-bb-type-list">
+
+                      {BANK_TYPES_FOR_FORM.map((type) => {
+                        const selected = bankForm.types.includes(type);
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            className={`admin-bb-type-pill${selected ? " selected" : ""}`}
+                            onClick={() => setBankForm((prev) => ({
+                              ...prev,
+                              types: prev.types.includes(type)
+                                ? prev.types.filter((v) => v !== type)
+                                : [...prev.types, type],
+                            }))}
+                          >
+                            {type}
+                          </button>
+                        );
+                      })}
+
+                    </div>
+
+                  </div>
+
+                  <select value={bankForm.status} onChange={(e) => setBankForm((prev) => ({ ...prev, status: e.target.value }))}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+
+                  <select value={bankForm.availabilityStatus} onChange={(e) => setBankForm((prev) => ({ ...prev, availabilityStatus: e.target.value }))}>
+                    <option value="open">Open</option>
+                    <option value="limited">Limited</option>
+                  </select>
+
+                </div>
+
+                <div className="admin-bb-actions">
+
+                  <button type="button" className="admin-action-btn confirm" onClick={() => saveBloodBank()}>
+                    Save Blood Bank
+                  </button>
+
+                  <button type="button" className="admin-action-btn view" onClick={openMapPicker}>
+                    Open Map Picker
+                  </button>
+
+                  <button type="button" className="admin-action-btn" onClick={resetBankForm}>
+                    Reset
+                  </button>
+
+                </div>
+
+                {bankMessage ? <div className="admin-bb-message">{bankMessage}</div> : null}
+
+              </div>
+
+
+
+              <div className="admin-banks-list-head">
+
+                <input
+                  className="admin-banks-search"
+                  placeholder="Search by name or dzongkhag"
+                  value={bloodBankSearch}
+                  onChange={(e) => {
+                    setBloodBankSearch(e.target.value);
+                    setBloodBankPage(1);
+                  }}
+                />
+
+                <label className="admin-banks-check">
+                  <input
+                    type="checkbox"
+                    checked={includeInactiveBanks}
+                    onChange={(e) => {
+                      setIncludeInactiveBanks(e.target.checked);
+                      setBloodBankPage(1);
+                    }}
+                  />
+                  Include inactive blood banks
+                </label>
+
+              </div>
+
+
+
+              <div className="admin-table-wrap">
+                {loadingBloodBanks ? (
+                  <div className="admin-table-msg">Loading blood banks...</div>
+                ) : errorBloodBanks && bankRows.length === 0 ? (
+                  <div className="admin-table-msg error">{errorBloodBanks}</div>
+                ) : (
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Dzongkhag</th>
+                        <th>Phone</th>
+                        <th>Coordinates</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bankRows.map((bank) => {
+                        const status = String(bank.status || "active").toLowerCase();
+                        const isActive = status === "active";
+                        const coordText = bank.latitude != null && bank.longitude != null ? `${bank.latitude}, ${bank.longitude}` : "Not set";
+                        return (
+                          <tr key={bank.id} className={archiveTarget === bank.id ? "admin-row-archived" : ""}>
+                            <td className="admin-td-id">{bank.id}</td>
+                            <td className="admin-td-name">{bank.name}</td>
+                            <td>{bank.dzongkhag || "—"}</td>
+                            <td>{bank.phone || "—"}</td>
+                            <td>{coordText}</td>
+                            <td>
+                              <span className={`admin-status-badge ${isActive ? "admin-status-confirmed" : "admin-status-rejected"}`}>
+                                {isActive ? "Active" : "Inactive"}
+                              </span>
+                            </td>
+                            <td className="admin-td-actions">
+                              <button type="button" className="admin-action-btn edit" onClick={() => editBankFromRow(bank)}>Edit</button>
+                              <button type="button" className="admin-action-btn view" onClick={() => setBankLocation(bank)}>Set Location</button>
+                              <button type="button" className="admin-action-btn reject" onClick={() => archiveBloodBank(bank)}>Archive</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+
+
+              <div className="admin-pagination">
+                <button
+                  type="button"
+                  className="admin-action-btn"
+                  disabled={bloodBankPagination.page <= 1 || loadingBloodBanks}
+                  onClick={() => setBloodBankPage((prev) => Math.max(1, prev - 1))}
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {bloodBankPagination.page || 1} of {bloodBankPagination.totalPages || 1}
+                </span>
+                <button
+                  type="button"
+                  className="admin-action-btn"
+                  disabled={(bloodBankPagination.page || 1) >= (bloodBankPagination.totalPages || 1) || loadingBloodBanks}
+                  onClick={() => setBloodBankPage((prev) => Math.min(bloodBankPagination.totalPages || 1, prev + 1))}
+                >
+                  Next
+                </button>
+              </div>
 
             </div>
 

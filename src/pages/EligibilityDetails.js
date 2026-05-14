@@ -197,6 +197,10 @@ export default function EligibilityDetails() {
       {/* Footer */}
       <footer className="footer">
         <p>© 2026 <strong>National Blood Transfusion Services</strong> · Ministry of Health, Bhutan</p>
+        <p className="footer-contact">
+          <span>📧 <a href="mailto:admin@bts.bt">admin@bts.bt</a></span>
+          <span>📞 <a href="tel:17967631">17967631</a></span>
+        </p>
         <p className="footer-hotline">Helpline: <span>1095</span> · Available 24/7</p>
       </footer>
 

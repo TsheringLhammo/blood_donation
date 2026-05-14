@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+/* eslint-disable no-unused-vars */
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { authFetch, getStoredUser, saveAuthSession } from '../utils/auth';
 import './DonorProfile.css';
 
 const bloodGroupOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-const dzongkhags = ['Thimphu', 'Punakha', 'Wangdue Phodrang', 'Trongsa', 'Bumthang', 'Lhuentse', 'Mongar', 'Trashigang', 'Trashiyangtse', 'Samdrup Jongkhar', 'Sarpang', 'Chukha', 'Haa', 'Gasa', 'Paro', 'Zhemgang', 'Dagana', 'Tsirang'];
+const _dzongkhags = ['Thimphu', 'Punakha', 'Wangdue Phodrang', 'Trongsa', 'Bumthang', 'Lhuentse', 'Mongar', 'Trashigang', 'Trashiyangtse', 'Samdrup Jongkhar', 'Sarpang', 'Chukha', 'Haa', 'Gasa', 'Paro', 'Zhemgang', 'Dagana', 'Tsirang'];
 
 const initialForm = {
   full_name: '',
@@ -28,7 +29,7 @@ export default function DonorProfile() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState(initialForm);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [imageError, setImageError] = useState('');
@@ -200,7 +201,7 @@ export default function DonorProfile() {
     }
   };
 
-  const profileCompleted = Boolean(form.full_name || form.email || form.phone);
+  const _profileCompleted = Boolean(form.full_name || form.email || form.phone);
 
   return (
     <div className="donor-profile-page">

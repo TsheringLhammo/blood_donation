@@ -409,6 +409,10 @@
 /* FOOTER */
 .footer { background: #111; color: rgba(255,255,255,0.6); text-align: center; padding: 28px 20px; font-size: 13px; line-height: 1.8; }
 .footer strong { color: white; }
+.footer-contact { margin: 10px auto 0; display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 14px; font-size: 13px; }
+.footer-contact span { display: inline-flex; align-items: center; gap: 6px; }
+.footer-contact a { color: white; text-decoration: none; }
+.footer-contact a:hover { text-decoration: underline; }
 .footer-hotline { margin-top: 4px; }
 .footer-hotline span { color: #C8102E; font-weight: 700; }
 

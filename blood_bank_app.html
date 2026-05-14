@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Blood Bank Management — Demo</title>
+  <style>
+    :root{--bg:#f6f8fb;--card:#fff;--muted:#6b7280;--accent:#c53030;--accent-2:#0b69ff;--success:#16a34a}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;background:var(--bg);color:#111}
+    a{color:inherit}
+    .container{max-width:1100px;margin:24px auto;padding:16px}
+
+    /* Public header */
+    .public-header{display:flex;align-items:center;justify-content:space-between;padding:18px 12px;background:linear-gradient(90deg,#fff, #f8fafc);border-radius:10px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:42px;height:42px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+    .nav{display:flex;gap:12px}
+    .nav a{padding:8px 12px;border-radius:8px;color:var(--muted);text-decoration:none}
+    .nav a:hover{background:#f1f5f9;color:#000}
+
+    .hero{display:flex;gap:20px;align-items:center;padding:28px;margin-top:14px;border-radius:12px;background:linear-gradient(90deg,#fff,#ffffff);box-shadow:0 6px 18px rgba(12,13,14,0.05)}
+    .hero-text h1{margin:0;font-size:28px}
+    .hero-text p{color:var(--muted);margin-top:8px}
+    .hero-cta{display:flex;gap:8px;margin-top:12px}
+    .btn{padding:10px 14px;border-radius:8px;border:0;cursor:pointer}
+    .btn.primary{background:var(--accent-2);color:#fff}
+    .btn.outline{background:#fff;border:1px solid #e6eefb;color:var(--accent-2)}
+
+    /* Banks list */
+    .banks{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+    .bank-card{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 4px 10px rgba(12,13,14,0.04)}
+    .bank-card h4{margin:0 0 6px 0}
+    .bank-meta{color:var(--muted);font-size:13px}
+
+    footer{margin-top:28px;padding:18px;text-align:center;color:var(--muted)}
+
+    /* Admin layout */
+    .admin-wrap{display:flex;gap:18px;margin-top:18px}
+    .sidebar{width:220px;background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 20px rgba(12,13,14,0.04)}
+    .sidebar nav a{display:block;padding:10px;border-radius:8px;color:var(--muted);text-decoration:none;margin-bottom:6px}
+    .sidebar nav a.active{background:#eef2ff;color:var(--accent-2)}
+    .admin-main{flex:1;background:var(--card);padding:14px;border-radius:10px;box-shadow:0 6px 20px rgba(12,13,14,0.04)}
+
+    .admin-controls{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+    .search{flex:1;display:flex;gap:8px}
+    .search input[type="text"]{flex:1;padding:8px;border:1px solid #e6eefb;border-radius:8px}
+    .checkbox{display:flex;gap:6px;align-items:center;color:var(--muted)}
+
+    .bank-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;border-radius:8px;border:1px dashed #eef2ff;margin-bottom:12px}
+    .bank-form .full{grid-column:1/-1}
+    .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    .field input,.field textarea, .field select{width:100%;padding:8px;border:1px solid #e6eefb;border-radius:8px}
+    .types{display:flex;gap:6px;flex-wrap:wrap}
+    .type-pill{padding:6px 8px;border-radius:999px;background:#f8fafc;border:1px solid #eef2ff;cursor:pointer;color:var(--muted)}
+    .type-pill.selected{background:#0b69ff;color:#fff;border-color:#0b69ff}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;text-align:left;border-bottom:1px solid #f1f5f9}
+    th{background:#fafafa;font-weight:600}
+    .actions button{margin-right:6px}
+    .muted{color:var(--muted);font-size:13px}
+
+    /* Responsive */
+    @media (max-width:900px){
+      .hero{flex-direction:column;align-items:flex-start}
+      .admin-wrap{flex-direction:column}
+      .sidebar{width:100%}
+      .bank-form{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Public Header -->
+    <div class="public-header" id="publicHeader">
+      <div class="brand">
+        <div class="logo">BB</div>
+        <div>
+          <div style="font-weight:700">Blood Bank Bhutan</div>
+          <div style="font-size:12px;color:var(--muted)">Ministry of Health</div>
+        </div>
+      </div>
+      <div class="nav" id="publicNav">
+        <a href="#" data-view="home">Home</a>
+        <a href="#" data-view="about">About Us</a>
+        <a href="#" data-view="aboutblood">About Blood</a>
+        <a href="#" data-view="donating">Donating Blood</a>
+        <a href="#" data-view="info">Information & Publications</a>
+        <a href="#" id="openAdminBtn" style="background:#111;color:#fff;padding:8px 10px;border-radius:8px">Admin</a>
+      </div>
+    </div>
+
+    <div class="hero" id="homeHero">
+      <div style="flex:1" class="hero-text">
+        <h1>Donate Blood. Save Lives.</h1>
+        <p>Join hands with the Ministry of Health. Sign up as a donor or book an appointment to donate.</p>
+        <div class="hero-cta">
+          <button class="btn primary" id="registerDonor">Register as Donor</button>
+          <button class="btn outline" id="bookAppointment">Book Appointment →</button>
+        </div>
+      </div>
+      <div style="width:260px">
+        <img src="https://images.unsplash.com/photo-1580281657523-6a0cdbd9f5a0?q=80&w=600&auto=format&fit=crop&ixlib=rb-4.0.3&s=4e90b0f6f3a3e2ea2981b61bf3eefec9" alt="donate" style="width:100%;border-radius:10px;object-fit:cover;height:160px">
+      </div>
+    </div>
+
+    <h3 style="margin-top:18px">Blood Banks (Active)</h3>
+    <div id="publicBanks" class="banks"></div>
+
+    <footer>Ministry of Health, Bhutan</footer>
+
+    <!-- Admin area (hidden by default) -->
+    <div id="adminArea" style="display:none;margin-top:18px">
+      <div class="admin-wrap">
+        <aside class="sidebar">
+          <div style="font-weight:700;margin-bottom:8px">Admin</div>
+          <nav>
+            <a href="#" data-admin="dashboard" class="active">Dashboard</a>
+            <a href="#" data-admin="bloodbanks">Blood Banks</a>
+            <a href="#" data-admin="donors">Donors</a>
+            <a href="#" data-admin="appointments">Appointments</a>
+            <a href="#" data-admin="camps">Camp Requests</a>
+          </nav>
+          <div style="margin-top:12px">
+            <button class="btn" id="closeAdmin">Close Admin</button>
+          </div>
+        </aside>
+        <main class="admin-main">
+          <div id="adminContent">
+            <h2>Dashboard</h2>
+            <p class="muted">Admin overview — click "Blood Banks" to manage banks.</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Simple localStorage-backed data model
+    const STORAGE_KEY = 'blood_banks_v1';
+    const SAMPLE = [
+      { id: 9, name: 'Bumthang Blood Bank', dzongkhag: 'Bumthang', phone: '17967631', address: 'Bumthang', latitude: '', longitude: '', status: 'active', availabilityStatus: 'open', types: ['A+','A-'] },
+      { id: 2, name: 'Phuentsholing Blood Bank', dzongkhag: 'Chukha', phone: '05-252431', address: 'Phuentsholing', latitude: '', longitude: '', status: 'active', availabilityStatus: 'open', types: ['B+','B-'] },
+      { id: 16, name: 'Dagana District Blood Bank', dzongkhag: 'Dagana', phone: '05-35116', address: 'Dagana', latitude: '', longitude: '', status: 'active', availabilityStatus: 'open', types: ['AB+'] },
+      { id: 5, name: 'Gasa District Blood Bank', dzongkhag: 'Gasa', phone: '02-68116', address: 'Gasa', latitude: '', longitude: '', status: 'active', availabilityStatus: 'open', types: ['O+'] },
+    ];
+
+    function loadBanks(){
+      try{ const raw = localStorage.getItem(STORAGE_KEY); if(!raw) return null; return JSON.parse(raw); }catch(e){return null}
+    }
+    function saveBanks(banks){ localStorage.setItem(STORAGE_KEY, JSON.stringify(banks)); window.dispatchEvent(new Event('banks-updated')); }
+
+    function ensureSample(){
+      let banks = loadBanks();
+      if(!banks){ banks = SAMPLE.slice(); saveBanks(banks); }
+      return banks;
+    }
+
+    // Render public active banks
+    function renderPublic(){
+      const wrap = document.getElementById('publicBanks');
+      const banks = (loadBanks() || []).filter(b=>String(b.status||'active')==='active');
+      wrap.innerHTML = '';
+      if(banks.length===0){ wrap.innerHTML = '<p class="muted">No active blood banks yet.</p>'; return; }
+      for(const b of banks){
+        const el = document.createElement('div'); el.className='bank-card';
+        el.innerHTML = `<h4>${escapeHtml(b.name)}</h4><div class="bank-meta">${escapeHtml(b.dzongkhag)} • ${escapeHtml(b.phone || '')}</div><div style="margin-top:8px;color:var(--muted);font-size:13px">${escapeHtml(b.address||'')}</div>`;
+        wrap.appendChild(el);
+      }
+    }
+
+    // Utilities
+    function escapeHtml(s){ if(s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function genId(){ return Date.now() + Math.floor(Math.random()*999); }
+
+    // Admin UI
+    const adminArea = document.getElementById('adminArea');
+    const adminContent = document.getElementById('adminContent');
+    document.getElementById('openAdminBtn').addEventListener('click', ()=>{ adminArea.style.display='block'; document.querySelector('[data-admin="bloodbanks"]').click(); window.scrollTo({top:0,behavior:'smooth'}); });
+    document.getElementById('closeAdmin').addEventListener('click', ()=>{ adminArea.style.display='none'; });
+
+    // Admin navigation
+    document.querySelectorAll('.sidebar nav a').forEach(a=>a.addEventListener('click', (ev)=>{
+      ev.preventDefault(); document.querySelectorAll('.sidebar nav a').forEach(x=>x.classList.remove('active')); a.classList.add('active');
+      const key = a.getAttribute('data-admin'); showAdminSection(key);
+    }));
+
+    function showAdminSection(key){
+      if(key==='bloodbanks') renderAdminBanks();
+      else if(key==='dashboard') adminContent.innerHTML = `<h2>Dashboard</h2><p class="muted">Overview content here.</p>`;
+      else adminContent.innerHTML = `<h2>${capitalize(key)}</h2><p class="muted">No content for this demo.</p>`;
+    }
+
+    function capitalize(s){ return String(s||'').charAt(0).toUpperCase() + String(s||'').slice(1); }
+
+    // Render admin banks management
+    function renderAdminBanks(){
+      const banks = loadBanks() || [];
+      adminContent.innerHTML = `
+        <h2>Blood Banks</h2>
+        <div class="admin-controls">
+          <div class="search"><input type="text" id="adminSearch" placeholder="Search by name or dzongkhag"></div>
+          <label class="checkbox"><input type="checkbox" id="includeInactive"> Include inactive blood banks</label>
+          <div style="margin-left:auto"><button class="btn" id="newBankBtn">Add New Bank</button></div>
+        </div>
+        <form id="bankForm" class="bank-form" style="display:none">
+          <div class="field full"><label>Name</label><input name="name" required /></div>
+          <div class="field"><label>Dzongkhag</label><input name="dzongkhag" /></div>
+          <div class="field"><label>Address</label><input name="address" /></div>
+          <div class="field"><label>Phone</label><input name="phone" /></div>
+          <div class="field"><label>Email</label><input name="email" type="email" /></div>
+          <div class="field"><label>Hours</label><input name="hours" /></div>
+          <div class="field"><label>Latitude</label><input name="latitude" /></div>
+          <div class="field"><label>Longitude</label><input name="longitude" /></div>
+          <div class="field full"><label>Blood groups</label><div class="types" id="typePills"></div></div>
+          <div class="field"><label>Status</label><select name="status"><option value="active">Active</option><option value="archived">Archived</option></select></div>
+          <div class="field"><label>Availability</label><select name="availabilityStatus"><option value="open">Open</option><option value="closed">Closed</option></select></div>
+          <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end">
+            <button type="button" class="btn" id="resetForm">Reset</button>
+            <button type="button" class="btn" id="mapPicker">Map Picker</button>
+            <button type="submit" class="btn primary">Save Bank</button>
+          </div>
+        </form>
+        <div id="banksTableWrap"></div>
+      `;
+
+      // setup pills
+      const types = ['A+','A-','B+','B-','AB+','AB-','O+','O-'];
+      const pills = document.getElementById('typePills');
+      pills.innerHTML = '';
+      for(const t of types){ const btn = document.createElement('div'); btn.className='type-pill'; btn.textContent=t; btn.dataset.type=t; btn.addEventListener('click', ()=>btn.classList.toggle('selected')); pills.appendChild(btn);} 
+
+      const bankForm = document.getElementById('bankForm');
+      const newBankBtn = document.getElementById('newBankBtn');
+      const resetForm = document.getElementById('resetForm');
+      const mapPicker = document.getElementById('mapPicker');
+      const adminSearch = document.getElementById('adminSearch');
+      const includeInactive = document.getElementById('includeInactive');
+
+      newBankBtn.addEventListener('click', ()=>{ bankForm.style.display='grid'; bankForm.dataset.editId=''; bankForm.querySelector('[name="name"]').focus(); clearForm(); });
+      resetForm.addEventListener('click', clearForm);
+      mapPicker.addEventListener('click', ()=>{
+        const lat = bankForm.querySelector('[name="latitude"]').value.trim();
+        const lng = bankForm.querySelector('[name="longitude"]').value.trim();
+        const q = (lat && lng) ? `${lat},${lng}` : 'Bhutan';
+        window.open('https://www.google.com/maps?q='+encodeURIComponent(q),'_blank');
+      });
+
+      bankForm.addEventListener('submit', (ev)=>{
+        ev.preventDefault(); const form = ev.target; const data = new FormData(form);
+        const selectedTypes = Array.from(pills.querySelectorAll('.type-pill.selected')).map(x=>x.dataset.type);
+        const obj = {
+          id: form.dataset.editId ? Number(form.dataset.editId) : genId(),
+          name: data.get('name')||'', dzongkhag: data.get('dzongkhag')||'', address: data.get('address')||'', phone: data.get('phone')||'', email: data.get('email')||'', hours: data.get('hours')||'', latitude: data.get('latitude')||'', longitude: data.get('longitude')||'', types: selectedTypes.length?selectedTypes:types, status: data.get('status')||'active', availabilityStatus: data.get('availabilityStatus')||'open'
+        };
+        const banks = loadBanks()||[];
+        const idx = banks.findIndex(b=>Number(b.id)===Number(obj.id));
+        if(idx>=0){ banks[idx]=obj; } else { banks.unshift(obj); }
+        saveBanks(banks); bankForm.style.display='none'; renderAdminBanks();
+      });
+
+      adminSearch.addEventListener('input', ()=>renderBanksTable());
+      includeInactive.addEventListener('change', ()=>renderBanksTable());
+
+      function clearForm(){ bankForm.reset(); bankForm.dataset.editId=''; pills.querySelectorAll('.type-pill').forEach(p=>p.classList.remove('selected')); }
+
+      function renderBanksTable(){
+        const banksWrap = document.getElementById('banksTableWrap');
+        const q = adminSearch.value.trim().toLowerCase();
+        const showInactive = includeInactive.checked;
+        let rows = (loadBanks()||[]).slice();
+        if(!showInactive) rows = rows.filter(r=>String(r.status||'active')==='active');
+        if(q) rows = rows.filter(r=> (r.name||'').toLowerCase().includes(q) || (r.dzongkhag||'').toLowerCase().includes(q));
+        let html = '<table><thead><tr><th>#</th><th>Name</th><th>Dzongkhag</th><th>Phone</th><th>Coordinates</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+        if(rows.length===0) html += '<tr><td colspan="7" class="muted">No banks found.</td></tr>';
+        rows.forEach((b,i)=>{
+          const coords = (b.latitude||b.longitude)?`${b.latitude||''}, ${b.longitude||''}`:'-';
+          html += `<tr><td>${i+1}</td><td>${escapeHtml(b.name)}</td><td>${escapeHtml(b.dzongkhag)}</td><td>${escapeHtml(b.phone||'')}</td><td>${escapeHtml(coords)}</td><td>${escapeHtml(b.status)}</td><td class="actions"><button class="btn" data-act="edit" data-id="${b.id}">Edit</button><button class="btn" data-act="loc" data-id="${b.id}">Set Location</button><button class="btn" data-act="archive" data-id="${b.id}">${b.status==='active'?'Archive':'Restore'}</button></td></tr>`;
+        });
+        html += '</tbody></table>';
+        banksWrap.innerHTML = html;
+        banksWrap.querySelectorAll('button[data-act]').forEach(btn=>btn.addEventListener('click', (ev)=>{
+          const id = Number(btn.dataset.id); const act = btn.dataset.act; const banks = loadBanks()||[]; const row = banks.find(x=>Number(x.id)===Number(id));
+          if(act==='edit'){ bankForm.style.display='grid'; bankForm.dataset.editId = String(row.id); bankForm.querySelector('[name="name"]').value = row.name||''; bankForm.querySelector('[name="dzongkhag"]').value = row.dzongkhag||''; bankForm.querySelector('[name="address"]').value = row.address||''; bankForm.querySelector('[name="phone"]').value = row.phone||''; bankForm.querySelector('[name="email"]').value = row.email||''; bankForm.querySelector('[name="hours"]').value = row.hours||''; bankForm.querySelector('[name="latitude"]').value = row.latitude||''; bankForm.querySelector('[name="longitude"]').value = row.longitude||''; bankForm.querySelector('[name="status"]').value = row.status||'active'; bankForm.querySelector('[name="availabilityStatus"]').value = row.availabilityStatus||'open'; pills.querySelectorAll('.type-pill').forEach(p=>p.classList.toggle('selected', (row.types||[]).includes(p.dataset.type)) ); }
+          if(act==='loc'){ const lat = prompt('Latitude for '+row.name+':', row.latitude||''); if(lat===null) return; const lng = prompt('Longitude for '+row.name+':', row.longitude||''); if(lng===null) return; row.latitude = lat.trim(); row.longitude = lng.trim(); saveBanks(banks); renderBanksTable(); }
+          if(act==='archive'){ if(!confirm((row.status==='active'?'Archive ':'Restore ')+row.name+'?')) return; row.status = row.status==='active'?'archived':'active'; saveBanks(banks); renderBanksTable(); }
+        }));
+      }
+
+      // first render
+      renderBanksTable();
+    }
+
+    // Storage sync: when in other window
+    window.addEventListener('storage', (ev)=>{ if(ev.key===STORAGE_KEY) { renderPublic(); const activeNav = document.querySelector('.sidebar nav a.active'); if(activeNav && activeNav.dataset.admin==='bloodbanks'){ renderAdminBanks(); } } });
+    window.addEventListener('banks-updated', ()=>{ renderPublic(); const activeNav = document.querySelector('.sidebar nav a.active'); if(activeNav && activeNav.dataset.admin==='bloodbanks'){ renderAdminBanks(); } });
+
+    // Init
+    ensureSample(); renderPublic();
+
+    // Simple interactions for hero buttons
+    document.getElementById('registerDonor').addEventListener('click', ()=>alert('Donor registration flow (demo).'));
+    document.getElementById('bookAppointment').addEventListener('click', ()=>alert('Book appointment flow (demo).'));
+
+    // Accessibility: close admin when clicking outside
+    document.addEventListener('keydown', (ev)=>{ if(ev.key==='Escape'){ adminArea.style.display='none'; } });
+
+  </script>
+</body>
+</html>
