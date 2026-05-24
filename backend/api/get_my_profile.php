@@ -34,7 +34,8 @@ $tableHasColumn = static function (PDO $pdo, string $tableName, string $columnNa
     }
 };
 
-$claims = bts_require_auth(['donor']);
+$claims = bts_require_auth(['donor', 'staff', 'admin', 'doctor']);
+$role = trim((string)($claims['role'] ?? ''));
 $userId = (int)($claims['sub'] ?? 0);
 $email = trim((string)($claims['email'] ?? ''));
 
@@ -45,6 +46,8 @@ if ($userId <= 0 || $email === '') {
 }
 
 try {
+    $hasAgeColumn = $tableHasColumn($pdo, 'tbldonors', 'age');
+    $hasGenderColumn = $tableHasColumn($pdo, 'tbldonors', 'gender');
     $hasStatusColumn = $tableHasColumn($pdo, 'tbldonors', 'status');
     $hasDeferredColumn = $tableHasColumn($pdo, 'tbldonors', 'deferred');
     $hasDeferralReasonColumn = $tableHasColumn($pdo, 'tbldonors', 'deferral_reason');
@@ -54,6 +57,7 @@ try {
     $hasEligibilityColumn = $tableHasColumn($pdo, 'tbldonors', 'eligibility');
     $hasTestResultColumn = $tableHasColumn($pdo, 'tbldonors', 'test_result');
     $hasWorkflowStatusColumn = $tableHasColumn($pdo, 'tbldonors', 'workflow_status');
+    $hasCidNumberColumn = $tableHasColumn($pdo, 'tbldonors', 'cid_number');
 
     $statusSelect = $hasStatusColumn ? "COALESCE(status, 'Pending') AS status" : "'Pending' AS status";
     $deferredSelect = $hasDeferredColumn ? 'COALESCE(deferred, 0) AS deferred' : '0 AS deferred';
@@ -67,8 +71,8 @@ try {
 
     // Try exact email match first, then case-insensitive + trimmed email to avoid stale fallback profiles.
     $stmt = $pdo->prepare(
-        'SELECT id, full_name, email, phone, date_of_birth, blood_type, address, city, dzongkhag,
-                emergency_contact_name, emergency_contact_phone, age, gender,
+        'SELECT id, full_name, email, phone, cid_number, date_of_birth, blood_type, address, city, dzongkhag,
+            emergency_contact_name, emergency_contact_phone, ' . ($hasAgeColumn ? 'age' : 'NULL AS age') . ', ' . ($hasGenderColumn ? 'gender' : 'NULL AS gender') . ',
                 ' . $statusSelect . ',
                 ' . $deferredSelect . ',
                 ' . $deferralReasonSelect . ',
@@ -86,9 +90,61 @@ try {
     $stmt->execute([$email]);
     $profile = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    if ($role !== 'donor') {
+        $userHasPhone = $tableHasColumn($pdo, 'tblusers', 'phone');
+        $userHasDateOfBirth = $tableHasColumn($pdo, 'tblusers', 'date_of_birth');
+        $userHasAddress = $tableHasColumn($pdo, 'tblusers', 'address');
+        $userHasCity = $tableHasColumn($pdo, 'tblusers', 'city');
+        $userHasDzongkhag = $tableHasColumn($pdo, 'tblusers', 'dzongkhag');
+        $userHasEmergencyContactName = $tableHasColumn($pdo, 'tblusers', 'emergency_contact_name');
+        $userHasEmergencyContactPhone = $tableHasColumn($pdo, 'tblusers', 'emergency_contact_phone');
+        $userHasProfilePicture = $tableHasColumn($pdo, 'tblusers', 'profile_picture');
+        $userHasAssignedBloodBank = $tableHasColumn($pdo, 'tblusers', 'assigned_blood_bank');
+        $userHasPosition = $tableHasColumn($pdo, 'tblusers', 'position');
+        $userHasEmployeeId = $tableHasColumn($pdo, 'tblusers', 'employee_id');
+
+        $selectColumns = [
+            'id',
+            'name AS full_name',
+            'email',
+            $userHasPhone ? 'phone' : 'NULL AS phone',
+            $userHasDateOfBirth ? 'date_of_birth' : 'NULL AS date_of_birth',
+            $userHasAddress ? 'address' : 'NULL AS address',
+            $userHasCity ? 'city' : 'NULL AS city',
+            $userHasDzongkhag ? 'dzongkhag' : 'NULL AS dzongkhag',
+            $userHasEmergencyContactName ? 'emergency_contact_name' : 'NULL AS emergency_contact_name',
+            $userHasEmergencyContactPhone ? 'emergency_contact_phone' : 'NULL AS emergency_contact_phone',
+            $userHasProfilePicture ? 'profile_picture' : 'NULL AS profile_picture',
+            $userHasAssignedBloodBank ? 'assigned_blood_bank' : 'NULL AS assigned_blood_bank',
+            $userHasPosition ? 'position' : 'NULL AS position',
+            $userHasEmployeeId ? 'employee_id' : 'NULL AS employee_id',
+        ];
+
+        $profileStmt = $pdo->prepare('SELECT ' . implode(', ', $selectColumns) . ' FROM tblusers WHERE id = ? LIMIT 1');
+        $profileStmt->execute([$userId]);
+        $profile = $profileStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$profile) {
+            http_response_code(404);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Staff profile not found in tblusers for authenticated user.',
+                'data' => [
+                    'user_id' => $userId,
+                    'email' => $email,
+                ],
+            ]);
+            exit;
+        }
+
+        echo json_encode(['success' => true, 'data' => $profile]);
+        exit;
+    }
+
     if (!$profile) {
         $stmtByNormalizedEmail = $pdo->prepare(
-            'SELECT id, full_name, email, phone, date_of_birth, blood_type, address, city, dzongkhag,
+            'SELECT id, full_name, email, phone, cid_number, date_of_birth, blood_type, address, city, dzongkhag,
+                    ' . ($hasAgeColumn ? 'age' : 'NULL AS age') . ', ' . ($hasGenderColumn ? 'gender' : 'NULL AS gender') . ',
                     ' . $statusSelect . ',
                     ' . $deferredSelect . ',
                     ' . $deferralReasonSelect . ',
@@ -120,10 +176,15 @@ try {
         exit;
     }
 
+    $profile['cid_number_masked'] = !empty($profile['cid_number'])
+        ? preg_replace('/^\d(?=\d{4})/', 'X', (string)$profile['cid_number'])
+        : null;
+    unset($profile['cid_number']);
+
     // Add computed current_status based on workflow_status (which is the source of truth)
     $workflowStatus = (string)($profile['workflow_status'] ?? '');
     $oldStatus = (string)($profile['status'] ?? 'Pending');
-    
+
     if ($workflowStatus === 'test_result_pending_decision') {
         $profile['current_status'] = 'pending_review';
     } elseif ($workflowStatus === 'decision_made_deferred') {

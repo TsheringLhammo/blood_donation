@@ -55,7 +55,7 @@ try {
     // Get camp requests
     $stmt = $pdo->prepare("
         SELECT COUNT(*) as total 
-        FROM camp_requests 
+        FROM tblblood_camps 
         WHERE status != 'deleted'
     ");
     $stmt->execute();

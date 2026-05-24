@@ -48,8 +48,10 @@ CREATE TABLE IF NOT EXISTS tblappointments (
     preferred_date DATE             NOT NULL,
     preferred_time VARCHAR(20)      NULL,
     blood_bank     VARCHAR(255)     NOT NULL,
+    notes          TEXT             NULL,
     status         ENUM('pending','confirmed','rejected') NOT NULL DEFAULT 'pending',
     created_at     TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_tblappointments_user_id (user_id)
 );
 
@@ -79,6 +81,17 @@ CREATE TABLE IF NOT EXISTS tblusers (
     email      VARCHAR(160)  NOT NULL UNIQUE,
     password   VARCHAR(255)  NOT NULL,   -- bcrypt hash (PASSWORD_BCRYPT)
     role       ENUM('admin','doctor','staff','donor') NOT NULL DEFAULT 'donor',
+    phone      VARCHAR(30)   NULL,
+    date_of_birth DATE       NULL,
+    address    VARCHAR(255)  NULL,
+    city       VARCHAR(120)  NULL,
+    dzongkhag  VARCHAR(120)  NULL,
+    emergency_contact_name  VARCHAR(120) NULL,
+    emergency_contact_phone VARCHAR(30)  NULL,
+    profile_picture LONGTEXT  NULL,
+    assigned_blood_bank VARCHAR(255) NULL,
+    position   VARCHAR(120)  NULL,
+    employee_id VARCHAR(80)   NULL,
     created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

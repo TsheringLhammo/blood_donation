@@ -27,18 +27,35 @@ bts_require_auth(['admin']);
 $jsonInput = file_get_contents('php://input');
 $data = json_decode($jsonInput, true);
 
-if (!$data || !isset($data['appointment_id']) || !isset($data['blood_type']) || !isset($data['units']) || !isset($data['expiration_date']) || !isset($data['storage_location'])) {
+
+if (!$data || !isset($data['appointment_id']) || !isset($data['storage_location'])) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
     exit;
 }
 
 $appointmentId = (int)$data['appointment_id'];
-$bloodType = $data['blood_type'];
-$units = (int)$data['units'];
-$expirationDate = $data['expiration_date'];
+$bloodType = $data['blood_type'] ?? null; // optional
 $storageLocation = $data['storage_location'];
 $notes = $data['notes'] ?? '';
+
+// Accept either legacy single-unit payload or new components array
+$components = $data['components'] ?? null;
+if (!$components) {
+    // legacy support
+    if (!isset($data['blood_type']) || !isset($data['units']) || !isset($data['expiration_date'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Missing required fields for legacy payload.']);
+        exit;
+    }
+    $components = [
+        [
+            'component_type' => $data['blood_type'],
+            'units' => (int)$data['units'],
+            'expiration_date' => $data['expiration_date']
+        ]
+    ];
+}
 
 try {
     // Start transaction
@@ -61,27 +78,38 @@ try {
         exit;
     }
     
-    // Add blood unit to inventory
-    $stmt = $pdo->prepare("
-        INSERT INTO blood_inventory (
-            blood_type, 
-            quantity, 
-            expiration_date, 
-            storage_location, 
-            notes, 
-            created_at, 
-            updated_at
-        ) VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-    ");
-    $stmt->execute([
-        $bloodType,
-        $units,
-        $expirationDate,
-        $storageLocation,
-        $notes
-    ]);
-    
-    $bloodUnitId = $pdo->lastInsertId();
+    // Add one inventory row per component
+        $insertStmt = $pdo->prepare("
+            INSERT INTO blood_inventory (
+                blood_type,
+                quantity,
+                expiration_date,
+                storage_location,
+                notes,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+        ");
+
+        $insertedIds = [];
+        foreach ($components as $comp) {
+            $compType = $comp['component_type'] ?? ($bloodType ?? 'Unknown');
+            $compUnits = (int)($comp['units'] ?? 1);
+            $compExpiry = $comp['expiration_date'] ?? null;
+
+            $rowNotes = trim(($notes ?: '') . ' ' . "[component: {$compType}]");
+
+            $insertStmt->execute([
+                $bloodType ?: $compType,
+                $compUnits,
+                $compExpiry,
+                $storageLocation,
+                $rowNotes
+            ]);
+
+            $insertedIds[] = $pdo->lastInsertId();
+        }
+        $bloodUnitId = end($insertedIds) ?: null;
     
     // Update appointment to mark blood unit added
     $updateStmt = $pdo->prepare("
@@ -101,7 +129,17 @@ try {
     // Simple notification logging - no database dependencies
     if ($donorEmail || $donorPhone) {
         $notificationTitle = "Blood Unit Collected Successfully";
-        $notificationMessage = "Thank you for your blood donation! We have successfully collected {$units} unit(s) of {$bloodType} blood. Your contribution will help save lives. The blood unit has been stored at {$storageLocation} and will be available until {$expirationDate}.";
+        // compute total units and a simple expiry note
+        $totalUnits = 0;
+        $expiries = [];
+        if (!empty($components) && is_array($components)) {
+            foreach ($components as $c) {
+                $totalUnits += (int)($c['units'] ?? 0);
+                if (!empty($c['expiration_date'])) $expiries[] = $c['expiration_date'];
+            }
+        }
+        $expiryNote = count($expiries) ? min($expiries) : '';
+        $notificationMessage = "Thank you for your blood donation! We have successfully collected {$totalUnits} unit(s) of blood. Your contribution will help save lives. The blood units have been stored at {$storageLocation}" . ($expiryNote ? " and the earliest expiry is {$expiryNote}." : ".");
         
         // Log notification to error log (always works)
         error_log("BLOOD UNIT NOTIFICATION: Donor: {$donorName}, Email: {$donorEmail}, Phone: {$donorPhone}, Message: {$notificationMessage}");
@@ -134,12 +172,10 @@ try {
     
     echo json_encode([
         'success' => true,
-        'message' => 'Blood unit added successfully and notification sent to donor',
+        'message' => 'Blood unit(s) added successfully and notification sent to donor',
         'data' => [
-            'blood_unit_id' => $bloodUnitId,
+            'inserted_ids' => $insertedIds ?? [],
             'blood_type' => $bloodType,
-            'units' => $units,
-            'expiration_date' => $expirationDate,
             'storage_location' => $storageLocation,
             'notes' => $notes,
             'notification_sent' => ($donorEmail || $donorPhone) ? true : false,

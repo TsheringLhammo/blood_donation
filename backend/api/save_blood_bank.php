@@ -108,6 +108,7 @@ $hoursJsonEncoded = json_encode($hoursJson, JSON_UNESCAPED_UNICODE);
 
 $latValue = is_numeric($latitude) ? (float)$latitude : null;
 $lngValue = is_numeric($longitude) ? (float)$longitude : null;
+$inventoryPayload = is_array($data['inventory'] ?? null) ? $data['inventory'] : [];
 
 function table_exists_save(PDO $pdo, string $table): bool {
     try {
@@ -129,6 +130,33 @@ function column_exists_save(PDO $pdo, string $table, string $column): bool {
     }
 }
 
+function normalize_inventory_payload(array $inventory): array {
+    $bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    $components = [
+        'Wholeblood' => 'whole_units',
+        'PRBC' => 'prbc_units',
+        'Platelets' => 'platelets_units',
+        'FFP' => 'ffp_units',
+    ];
+
+    $rows = [];
+    foreach ($bloodTypes as $bloodType) {
+        $rows[$bloodType] = [
+            'whole_units' => 0,
+            'prbc_units' => 0,
+            'platelets_units' => 0,
+            'ffp_units' => 0,
+        ];
+
+        foreach ($components as $componentKey => $columnKey) {
+            $units = $inventory[$componentKey][$bloodType]['units'] ?? 0;
+            $rows[$bloodType][$columnKey] = max(0, (int)$units);
+        }
+    }
+
+    return $rows;
+}
+
 try {
     if (!table_exists_save($pdo, 'tblblood_banks')) {
         http_response_code(503);
@@ -144,10 +172,12 @@ try {
     $hasLatitude = column_exists_save($pdo, 'tblblood_banks', 'latitude');
     $hasLongitude = column_exists_save($pdo, 'tblblood_banks', 'longitude');
     $hasServicesJson = column_exists_save($pdo, 'tblblood_banks', 'services_json');
+    $hasInventoryJson = column_exists_save($pdo, 'tblblood_banks', 'inventory_json');
     $hasStatus = column_exists_save($pdo, 'tblblood_banks', 'status');
     $hasDirectoryStatus = column_exists_save($pdo, 'tblblood_banks', 'directory_status');
     $hasIsActive = column_exists_save($pdo, 'tblblood_banks', 'is_active');
     $hasTypesCsv = column_exists_save($pdo, 'tblblood_banks', 'types_csv');
+    $hasInventoryTable = table_exists_save($pdo, 'tblinventory');
 
     if ($id > 0) {
         $setClauses = [
@@ -181,6 +211,18 @@ try {
         if ($hasHoursJson) {
             $setClauses[] = 'hours_json = :hours_json';
             $params[':hours_json'] = $hoursJsonEncoded;
+        }
+        if (!$hasInventoryJson) {
+            // try to add inventory_json column (best-effort)
+            try {
+                $pdo->exec('ALTER TABLE tblblood_banks ADD COLUMN inventory_json TEXT NULL');
+                $hasInventoryJson = true;
+            } catch (Throwable $ignored) {
+            }
+        }
+        if ($hasInventoryJson) {
+            $setClauses[] = 'inventory_json = :inventory_json';
+            $params[':inventory_json'] = json_encode($data['inventory'] ?? null, JSON_UNESCAPED_UNICODE);
         }
         if ($hasEmergency) {
             $setClauses[] = 'emergency = :emergency';
@@ -268,6 +310,18 @@ try {
             $placeholders[] = ':services_json';
             $params[':services_json'] = $servicesJsonEncoded;
         }
+        if (!$hasInventoryJson) {
+            try {
+                $pdo->exec('ALTER TABLE tblblood_banks ADD COLUMN inventory_json TEXT NULL');
+                $hasInventoryJson = true;
+            } catch (Throwable $ignored) {
+            }
+        }
+        if ($hasInventoryJson) {
+            $columns[] = 'inventory_json';
+            $placeholders[] = ':inventory_json';
+            $params[':inventory_json'] = json_encode($data['inventory'] ?? null, JSON_UNESCAPED_UNICODE);
+        }
         if ($hasStatus) {
             $columns[] = 'status';
             $placeholders[] = ':availability_status';
@@ -294,6 +348,31 @@ try {
         );
         $stmt->execute($params);
         $id = (int)$pdo->lastInsertId();
+    }
+
+    if ($hasInventoryTable) {
+        $inventoryRows = normalize_inventory_payload($inventoryPayload);
+        $inventoryStmt = $pdo->prepare(
+            'INSERT INTO tblinventory (blood_bank_id, blood_type, whole_units, prbc_units, platelets_units, ffp_units)
+             VALUES (:blood_bank_id, :blood_type, :whole_units, :prbc_units, :platelets_units, :ffp_units)
+             ON DUPLICATE KEY UPDATE
+               blood_bank_id = VALUES(blood_bank_id),
+               whole_units = VALUES(whole_units),
+               prbc_units = VALUES(prbc_units),
+               platelets_units = VALUES(platelets_units),
+               ffp_units = VALUES(ffp_units)'
+        );
+
+        foreach ($inventoryRows as $bloodType => $counts) {
+            $inventoryStmt->execute([
+                ':blood_bank_id' => $id,
+                ':blood_type' => $bloodType,
+                ':whole_units' => (int)$counts['whole_units'],
+                ':prbc_units' => (int)$counts['prbc_units'],
+                ':platelets_units' => (int)$counts['platelets_units'],
+                ':ffp_units' => (int)$counts['ffp_units'],
+            ]);
+        }
     }
 
     echo json_encode(['success' => true, 'id' => $id, 'message' => 'Blood bank saved successfully.']);

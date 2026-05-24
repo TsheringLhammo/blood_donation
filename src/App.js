@@ -16,8 +16,11 @@ import PublicInformation from "./pages/PublicInformation";
 import Dashboard from "./pages/Dashboard";
 import DonorProfile from "./pages/DonorProfile";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminProfile from "./pages/AdminProfile";
 import DoctorDashboard from "./pages/DoctorDashboard";
+import DoctorProfile from "./pages/DoctorProfile";
 import StaffDashboard from "./pages/StaffDashboard";
+import StaffProfile from "./pages/StaffProfile";
 import DonorsManagement from "./pages/admin/DonorsManagement";
 import { isUserAuthorized } from "./utils/auth";
 
@@ -58,9 +61,12 @@ function App() {
         <Route path="/dashboard" element={<ProtectedRoute roles={["donor"]}><Dashboard /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute roles={["donor"]}><DonorProfile /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute roles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin/profile" element={<ProtectedRoute roles={["admin"]}><AdminProfile /></ProtectedRoute>} />
         <Route path="/admin/donors" element={<ProtectedRoute roles={["admin"]}><DonorsManagement /></ProtectedRoute>} />
         <Route path="/doctor" element={<ProtectedRoute roles={["doctor"]}><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/doctor/profile" element={<ProtectedRoute roles={["doctor"]}><DoctorProfile /></ProtectedRoute>} />
         <Route path="/staff" element={<ProtectedRoute roles={["staff", "admin"]}><StaffDashboard /></ProtectedRoute>} />
+        <Route path="/staff/profile" element={<ProtectedRoute roles={["staff", "admin"]}><StaffProfile /></ProtectedRoute>} />
       </Routes>
     </Router>
   );

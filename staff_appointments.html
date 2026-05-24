@@ -324,6 +324,12 @@
             border: 1px solid var(--border);
         }
 
+        #add-unit-modal .modal {
+            width: min(1080px, 100%);
+            max-height: none;
+            overflow: visible;
+        }
+
         .modal-header {
             padding: 18px 20px 10px;
             border-bottom: 1px solid var(--border);
@@ -353,6 +359,93 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 14px;
+        }
+
+        .inventory-summary-strip {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin: 8px 0 14px;
+        }
+
+        .summary-card {
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: linear-gradient(180deg, #fff, #fcf7f1);
+            padding: 12px 14px;
+            display: grid;
+            gap: 4px;
+        }
+
+        .summary-label {
+            color: var(--muted);
+            font-size: 0.82rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .summary-value {
+            font-weight: 800;
+            color: var(--ink);
+        }
+
+        .component-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .component-row {
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: #fff;
+            padding: 14px;
+            display: grid;
+            grid-template-columns: minmax(220px, 1.4fr) 110px 160px 110px;
+            gap: 12px;
+            align-items: end;
+        }
+
+        .component-row .form-field {
+            margin-bottom: 0;
+        }
+
+        .component-row-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .component-row-actions .btn {
+            width: 100%;
+        }
+
+        .component-help {
+            margin-top: 6px;
+            font-size: 0.84rem;
+            color: var(--muted);
+        }
+
+        .component-warning {
+            border: 1px solid rgba(194, 122, 20, 0.25);
+            background: #fff5df;
+            color: #805800;
+            border-radius: 16px;
+            padding: 10px 12px;
+            margin-top: 12px;
+            font-size: 0.94rem;
+            font-weight: 700;
+        }
+
+        .component-toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .component-toolbar .btn {
+            border-radius: 14px;
         }
 
         .full { grid-column: 1 / -1; }
@@ -419,6 +512,9 @@
             .hero-actions { justify-content: flex-start; }
             .stats { grid-template-columns: 1fr; }
             .appointment-modal-grid { grid-template-columns: 1fr; }
+            .inventory-summary-strip { grid-template-columns: 1fr; }
+            .component-row { grid-template-columns: 1fr; }
+            .component-row-actions .btn { width: auto; }
             .toast { min-width: 0; width: calc(100vw - 32px); }
         }
     </style>
@@ -435,7 +531,7 @@
             <form id="add-unit-form">
                 <div class="modal-body">
                     <div class="notice">
-                        Record an individual blood unit, track donor attendance, and update inventory in one flow.
+                        Record multiple component bags from the same donation in one flow.
                     </div>
 
                     <div class="appointment-modal-grid">
@@ -452,22 +548,6 @@
                         <div class="form-field">
                             <label for="appointment-datetime">Appointment Date & Time</label>
                             <input id="appointment-datetime" type="datetime-local">
-                        </div>
-
-                        <div class="form-field">
-                            <label for="component-type">Component Type *</label>
-                            <select id="component-type" required>
-                                <option>Whole Blood</option>
-                                <option>Packed Red Cells (PRBC)</option>
-                                <option>Platelets</option>
-                                <option>Fresh Frozen Plasma (FFP)</option>
-                                <option>Cryoprecipitate</option>
-                            </select>
-                        </div>
-
-                        <div class="form-field">
-                            <label for="expiry-date">Expiry Date *</label>
-                            <input id="expiry-date" type="date" readonly>
                         </div>
 
                         <div class="form-field">
@@ -490,6 +570,30 @@
                             <input id="collection-date" type="date" readonly>
                         </div>
                     </div>
+
+                    <div class="inventory-summary-strip">
+                        <div class="summary-card">
+                            <div class="summary-label">Donor</div>
+                            <div class="summary-value" id="selected-donor-summary">Select a donor</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Blood Group</div>
+                            <div class="summary-value" id="blood-group-summary">O+</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Total Units</div>
+                            <div class="summary-value" id="total-units-summary">0 bags</div>
+                        </div>
+                    </div>
+
+                    <div id="component-rows" class="component-list" aria-label="Blood component rows"></div>
+
+                    <div class="component-toolbar">
+                        <button type="button" class="btn btn-outline" onclick="addComponentRow()">+ Add Component Row</button>
+                        <button type="button" class="btn btn-outline" onclick="addCustomComponentRow()">+ Add Custom Component</button>
+                    </div>
+
+                    <div id="component-warning" class="component-warning" style="display:none;"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline" onclick="closeAddUnitModal()">Cancel</button>
@@ -659,6 +763,15 @@
 
         let activeBloodGroup = 'O+';
         let activeNoShowAppointmentId = null;
+        let addUnitComponentRows = [];
+
+        const COMPONENT_OPTIONS = [
+            { value: 'Whole Blood', label: 'Whole Blood', suggestedDays: 35 },
+            { value: 'Packed Red Cells', label: 'Packed Red Cells (PRBC)', suggestedDays: 42 },
+            { value: 'Platelets', label: 'Platelets', suggestedDays: 5 },
+            { value: 'Plasma', label: 'Plasma', suggestedDays: 365 },
+            { value: 'Custom', label: 'Custom Component', suggestedDays: 42 }
+        ];
 
         function todayDateValue() {
             return new Date().toISOString().split('T')[0];
@@ -739,13 +852,162 @@
             const today = todayDateValue();
             document.getElementById('collection-date').value = today;
             document.getElementById('appointment-datetime').value = `${today}T09:00`;
-            document.getElementById('expiry-date').value = expiryDateValue();
         }
 
         function expiryDateValue() {
             const date = new Date();
             date.setDate(date.getDate() + 35);
             return date.toISOString().split('T')[0];
+        }
+
+        function suggestedExpiryDate(component) {
+            const option = COMPONENT_OPTIONS.find(item => item.value === component) || COMPONENT_OPTIONS[1];
+            const date = new Date();
+            date.setDate(date.getDate() + (option?.suggestedDays || 42));
+            return date.toISOString().split('T')[0];
+        }
+
+        function createComponentRow(component = 'Packed Red Cells', quantity = 1) {
+            return {
+                id: cryptoId(),
+                component,
+                quantity,
+                expiryDate: suggestedExpiryDate(component),
+                customName: ''
+            };
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function componentDisplayName(row) {
+            if (row.component === 'Custom') {
+                return row.customName || 'Custom component';
+            }
+            return row.component;
+        }
+
+        function updateComponentSummary() {
+            const donor = donorById(document.getElementById('donor-select').value);
+            const bloodGroup = document.getElementById('blood-group').value || activeBloodGroup;
+            const totalUnits = addUnitComponentRows.reduce((sum, row) => sum + (Number.parseInt(row.quantity, 10) || 0), 0);
+            const donorSummary = document.getElementById('selected-donor-summary');
+            const bloodSummary = document.getElementById('blood-group-summary');
+            const totalSummary = document.getElementById('total-units-summary');
+            const warning = document.getElementById('component-warning');
+
+            if (donorSummary) {
+                donorSummary.textContent = donor ? `${donor.id} - ${donor.name}` : 'Select a donor';
+            }
+            if (bloodSummary) {
+                bloodSummary.textContent = bloodGroup;
+            }
+            if (totalSummary) {
+                totalSummary.textContent = `${totalUnits} bag${totalUnits === 1 ? '' : 's'}`;
+            }
+            if (warning) {
+                if (totalUnits > 4) {
+                    warning.style.display = 'block';
+                    warning.textContent = `Typical yield from one donation is about 3-4 bags. You are adding ${totalUnits} bags.`;
+                } else {
+                    warning.style.display = 'none';
+                    warning.textContent = '';
+                }
+            }
+        }
+
+        function renderComponentRows() {
+            const container = document.getElementById('component-rows');
+            if (!container) return;
+
+            container.innerHTML = addUnitComponentRows.map((row) => `
+                <div class="component-row">
+                    <div class="form-field full">
+                        <label for="component-type-${row.id}">Component Type *</label>
+                        <select id="component-type-${row.id}" onchange="handleComponentRowChange('${row.id}', 'component', this.value)" required>
+                            ${COMPONENT_OPTIONS.map(option => `<option value="${option.value}" ${option.value === row.component ? 'selected' : ''}>${option.label}</option>`).join('')}
+                        </select>
+                        ${row.component === 'Custom' ? `
+                            <input
+                                id="custom-component-${row.id}"
+                                type="text"
+                                placeholder="Enter custom component name"
+                                value="${escapeHtml(row.customName || '')}"
+                                onchange="handleComponentRowChange('${row.id}', 'customName', this.value)"
+                                style="margin-top:10px;"
+                            >
+                        ` : ''}
+                    </div>
+
+                    <div class="form-field">
+                        <label for="quantity-${row.id}">Qty (bags)</label>
+                        <input id="quantity-${row.id}" type="number" min="1" step="1" value="${row.quantity}" onchange="handleComponentRowChange('${row.id}', 'quantity', this.value)">
+                    </div>
+
+                    <div class="form-field">
+                        <label for="expiry-${row.id}">Expiry Date *</label>
+                        <input id="expiry-${row.id}" type="date" value="${row.expiryDate}" onchange="handleComponentRowChange('${row.id}', 'expiryDate', this.value)">
+                        <div class="component-help">Suggested: ${suggestedExpiryDate(row.component)}</div>
+                    </div>
+
+                    <div class="component-row-actions">
+                        <button type="button" class="btn btn-outline small" onclick="removeComponentRow('${row.id}')" ${addUnitComponentRows.length === 1 ? 'disabled' : ''}>Remove Row</button>
+                    </div>
+                </div>
+            `).join('');
+
+            updateComponentSummary();
+        }
+
+        function handleComponentRowChange(rowId, field, value) {
+            addUnitComponentRows = addUnitComponentRows.map(row => {
+                if (row.id !== rowId) return row;
+
+                if (field === 'component') {
+                    const nextComponent = value || 'Packed Red Cells';
+                    return {
+                        ...row,
+                        component: nextComponent,
+                        expiryDate: suggestedExpiryDate(nextComponent),
+                        customName: nextComponent === 'Custom' ? row.customName : ''
+                    };
+                }
+
+                if (field === 'quantity') {
+                    const parsed = Number.parseInt(value, 10);
+                    return { ...row, quantity: Number.isFinite(parsed) && parsed > 0 ? parsed : 1 };
+                }
+
+                if (field === 'customName') {
+                    return { ...row, customName: value };
+                }
+
+                return { ...row, [field]: value };
+            });
+
+            renderComponentRows();
+        }
+
+        function addComponentRow() {
+            addUnitComponentRows.push(createComponentRow('Packed Red Cells', 1));
+            renderComponentRows();
+        }
+
+        function addCustomComponentRow() {
+            addUnitComponentRows.push(createComponentRow('Custom', 1));
+            renderComponentRows();
+        }
+
+        function removeComponentRow(rowId) {
+            if (addUnitComponentRows.length === 1) return;
+            addUnitComponentRows = addUnitComponentRows.filter(row => row.id !== rowId);
+            renderComponentRows();
         }
 
         function init() {
@@ -890,10 +1152,11 @@
             document.getElementById('blood-group').value = bloodGroup;
             document.getElementById('donation-id').value = '';
             document.getElementById('status-select').value = 'Available';
-            document.getElementById('component-type').value = 'Whole Blood';
             document.getElementById('donor-select').innerHTML = donorOptionsForBloodGroup(bloodGroup);
             document.getElementById('donor-select').value = '';
             setDateInputs();
+            addUnitComponentRows = [createComponentRow('Packed Red Cells', 1)];
+            renderComponentRows();
             handleDonorSelection();
             document.getElementById('add-unit-modal').classList.add('show');
         }
@@ -918,17 +1181,16 @@
             const selectedDonorId = document.getElementById('donor-select').value;
             const donor = donorById(selectedDonorId);
             const bloodGroupInput = document.getElementById('blood-group');
-            const expiryInput = document.getElementById('expiry-date');
 
             if (!donor) {
                 bloodGroupInput.value = activeBloodGroup;
-                expiryInput.value = expiryDateValue();
+                updateComponentSummary();
                 return;
             }
 
             bloodGroupInput.value = donor.bloodGroup;
-            expiryInput.value = expiryDateValue();
             document.getElementById('add-unit-stock').textContent = `Current ${donor.bloodGroup} Stock: ${totalForBloodGroup(donor.bloodGroup)} units`;
+            updateComponentSummary();
         }
 
         function handleAddUnitSubmit(event) {
@@ -937,6 +1199,17 @@
             const donorId = document.getElementById('donor-select').value;
             const donor = donorById(donorId);
             const bloodGroup = document.getElementById('blood-group').value || activeBloodGroup;
+            const appointmentDateTime = document.getElementById('appointment-datetime').value || `${todayDateValue()}T09:00`;
+            const collectionDate = document.getElementById('collection-date').value || todayDateValue();
+            const status = document.getElementById('status-select').value;
+            const donationId = document.getElementById('donation-id').value.trim();
+            const totalUnits = addUnitComponentRows.reduce((sum, row) => sum + (Number.parseInt(row.quantity, 10) || 0), 0);
+            const normalizedRows = addUnitComponentRows.map(row => ({
+                component: row.component,
+                quantity: Number.parseInt(row.quantity, 10) || 0,
+                expiryDate: row.expiryDate,
+                customName: row.component === 'Custom' ? (row.customName || '').trim() : ''
+            }));
 
             if (!donor) {
                 showToast('error', 'Select donor', 'Please select an approved donor with the matching blood group.');
@@ -948,13 +1221,28 @@
                 return;
             }
 
-            const appointmentDateTime = document.getElementById('appointment-datetime').value || `${todayDateValue()}T09:00`;
-            const collectionDate = document.getElementById('collection-date').value || todayDateValue();
-            const componentType = document.getElementById('component-type').value;
-            const status = document.getElementById('status-select').value;
-            const donationId = document.getElementById('donation-id').value.trim();
+            if (!normalizedRows.length || normalizedRows.some(row => !row.component || row.quantity < 1 || !row.expiryDate)) {
+                showToast('error', 'Complete all rows', 'Each component row needs a component, quantity of at least 1, and an expiry date.');
+                return;
+            }
 
-            state.inventory[bloodGroup].whole += 1;
+            if (totalUnits > 4) {
+                showToast('error', 'High yield warning', `Typical yield from one donation is about 3-4 bags. You are adding ${totalUnits} bags.`);
+            }
+
+            const inventoryIncrement = { whole: 0, prbc: 0, platelets: 0, plasma: 0 };
+            normalizedRows.forEach(row => {
+                const quantity = row.quantity;
+                if (row.component === 'Whole Blood') inventoryIncrement.whole += quantity;
+                else if (row.component === 'Packed Red Cells') inventoryIncrement.prbc += quantity;
+                else if (row.component === 'Platelets') inventoryIncrement.platelets += quantity;
+                else if (row.component === 'Plasma') inventoryIncrement.plasma += quantity;
+            });
+
+            state.inventory[bloodGroup].whole += inventoryIncrement.whole;
+            state.inventory[bloodGroup].prbc += inventoryIncrement.prbc;
+            state.inventory[bloodGroup].platelets += inventoryIncrement.platelets;
+            state.inventory[bloodGroup].plasma += inventoryIncrement.plasma;
 
             const relatedAppointment = state.appointments.find(appointment => appointment.date === appointmentDateTime.split('T')[0] && appointment.time === appointmentDateTime.split('T')[1].slice(0, 5) && appointment.donorId === donor.id);
             if (relatedAppointment && relatedAppointment.status === 'Scheduled') {
@@ -966,22 +1254,26 @@
                     bloodGroup,
                     time: relatedAppointment.time,
                     date: relatedAppointment.date,
-                    componentType,
-                    donationId: donationId || relatedAppointment.id || ''
+                    componentType: normalizedRows.length === 1
+                        ? `${normalizedRows[0].component}${normalizedRows[0].customName ? ` (${normalizedRows[0].customName})` : ''}`
+                        : `${normalizedRows.length} component rows`,
+                    donationId: donationId || relatedAppointment.id || '',
+                    components: normalizedRows,
+                    totalUnits
                 });
             }
 
             state.notifications.unshift({
                 id: cryptoId(),
                 type: 'success',
-                message: `✅ ${donor.name} (${bloodGroup}) added! Total ${bloodGroup}: ${totalForBloodGroup(bloodGroup)}`,
+                message: `✅ ${donor.name} (${bloodGroup}) added ${totalUnits} bag${totalUnits === 1 ? '' : 's'}! Total ${bloodGroup}: ${totalForBloodGroup(bloodGroup)}`,
                 date: collectionDate
             });
 
             saveState();
             renderAll();
             closeAddUnitModal();
-            showToast('success', 'Inventory updated', `✅ ${donor.name} (${bloodGroup}) added! Total ${bloodGroup}: ${totalForBloodGroup(bloodGroup)}`);
+            showToast('success', 'Inventory updated', `✅ ${donor.name} (${bloodGroup}) added ${totalUnits} bag${totalUnits === 1 ? '' : 's'}! Total ${bloodGroup}: ${totalForBloodGroup(bloodGroup)}`);
         }
 
         function confirmCompleted(appointmentId) {

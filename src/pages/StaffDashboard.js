@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import "./StaffDashboard.css";
 import { authFetch, clearAuthSession, getStoredUser } from "../utils/auth";
+import EditProfile from "../components/EditProfile";
+import NotificationBar from "../components/NotificationBar";
 
 const DEFAULT_STATS = {
   incomingRequests: 0,
@@ -22,6 +24,23 @@ const getInventoryTotal = (row) => (
   + toSafeUnits(row?.platelets_units)
   + toSafeUnits(row?.ffp_units)
 );
+
+const formatExpiryDays = (daysLeft) => {
+  if (daysLeft === null || daysLeft === undefined || Number.isNaN(Number(daysLeft))) {
+    return "—";
+  }
+
+  const numericDays = Number(daysLeft);
+  if (numericDays < 0) {
+    return `Expired ${Math.abs(numericDays)} day(s) ago`;
+  }
+
+  if (numericDays === 0) {
+    return "0 days";
+  }
+
+  return `${numericDays} day(s)`;
+};
 
 const normalizeRequestStatus = (status) => {
   const normalized = String(status || "").trim().toLowerCase();
@@ -55,6 +74,29 @@ const parseAvailableUnitIds = (value) => {
     .map((entry) => entry.trim())
     .filter(Boolean);
 };
+
+const COMPONENT_TYPE_OPTIONS = [
+  { value: "Whole Blood", label: "Whole Blood", suggestedDays: 35 },
+  { value: "Packed Red Cells", label: "Packed Red Cells (PRBC)", suggestedDays: 42 },
+  { value: "Platelets", label: "Platelets", suggestedDays: 5 },
+  { value: "Plasma", label: "Plasma", suggestedDays: 365 },
+];
+
+const getComponentOption = (component) => COMPONENT_TYPE_OPTIONS.find((option) => option.value === component) || COMPONENT_TYPE_OPTIONS[1];
+
+const getSuggestedExpiryDate = (component, baseDate = new Date()) => {
+  const option = getComponentOption(component);
+  const suggestedDate = new Date(baseDate);
+  suggestedDate.setDate(suggestedDate.getDate() + (option?.suggestedDays || 42));
+  return suggestedDate.toISOString().slice(0, 10);
+};
+
+const createComponentRow = (component = "Packed Red Cells") => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+  component,
+  quantity: 1,
+  expiryDate: getSuggestedExpiryDate(component),
+});
 
 const parseApiJson = async (response) => {
   const raw = String(await response.text() || "").replace(/^\uFEFF/, "").trim();
@@ -94,7 +136,11 @@ export default function StaffDashboard() {
   const [labUseLogs, setLabUseLogs] = useState([]);
   const [issueLogs, setIssueLogs] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [profileData, setProfileData] = useState(null);
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [popupNotice, setPopupNotice] = useState("");
+  const expiryNoticeShownRef = useRef(false);
   const [actionError, setActionError] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -105,11 +151,37 @@ export default function StaffDashboard() {
   const [labResultFilter, setLabResultFilter] = useState("all");
   const [selectedLabLog, setSelectedLabLog] = useState(null);
   const [selectedUnitsByRequest, setSelectedUnitsByRequest] = useState({});
+  const addInventoryModeTouchedRef = useRef(false);
+  const [stockDetailsModal, setStockDetailsModal] = useState({
+    open: false,
+    bloodType: "",
+    component: "PRBC",
+    stockLevel: "",
+    totalUnits: 0,
+    availableUnitsCount: 0,
+    units: [],
+    loading: false,
+    error: "",
+  });
   const [addInventoryModal, setAddInventoryModal] = useState({
     open: false,
     donationId: "",
+    donationHistoryId: 0,
     donorId: 0,
     bloodType: "",
+    appointmentDate: new Date().toISOString().slice(0, 10),
+    addMode: "local",
+    transferFromBankId: 0,
+    transferToBankId: 0,
+    transferReference: "",
+    transferDate: new Date().toISOString().slice(0, 10),
+    transportMethod: "Ambulance",
+    transferEmail: "",
+    notifySendingBank: true,
+    notifyReceivingBank: true,
+    notifyDoctor: false,
+    notifyDriver: false,
+    componentRows: [createComponentRow()],
     component: "Packed Red Cells",
     expiryDate: "",
     status: "Available",
@@ -117,6 +189,12 @@ export default function StaffDashboard() {
   const [confirmedDonors, setConfirmedDonors] = useState([]);
   const [confirmedDonorsLoading, setConfirmedDonorsLoading] = useState(false);
   const [confirmedDonorsError, setConfirmedDonorsError] = useState("");
+  const [appointmentDonors, setAppointmentDonors] = useState([]);
+  const [appointmentDonorsLoading, setAppointmentDonorsLoading] = useState(false);
+  const [appointmentDonorsError, setAppointmentDonorsError] = useState("");
+  const [bloodBanks, setBloodBanks] = useState([]);
+  const [bloodBanksLoading, setBloodBanksLoading] = useState(false);
+  const [bloodBanksError, setBloodBanksError] = useState("");
   const [donorSamples, setDonorSamples] = useState([]);
   const [donorSamplesLoading, setDonorSamplesLoading] = useState(false);
   const [donorSamplesError, setDonorSamplesError] = useState("");
@@ -221,31 +299,45 @@ export default function StaffDashboard() {
 
   const normalizeDonorSampleState = useCallback((value) => String(value || "Pending").trim().toLowerCase(), []);
   const confirmedDonorOptions = confirmedDonors;
+  const appointmentDonorOptions = appointmentDonors;
   const sampleCollectionDonors = useMemo(() => {
-    const seen = new Set();
-    // Filter to only include donors that don't already have samples
-    // The API now handles this by checking tbldonor_samples, so we just need to remove duplicates by name
-    return confirmedDonorOptions.filter((donor) => {
-      const nameKey = String(donor.full_name || "").trim().toLowerCase();
-      if (seen.has(nameKey)) return false;
-      seen.add(nameKey);
-      return true;
-    });
+    // Return confirmed donors as-is. Previously we removed duplicates by name
+    // which could accidentally hide donors that share the same name (e.g. "Gita Rai").
+    // The backend already filters/marks sample state, so show all confirmed donors here.
+    try {
+      // helpful debug during development
+      // console.debug('confirmedDonorOptions count:', confirmedDonorOptions.length);
+    } catch (e) {}
+    return confirmedDonorOptions;
   }, [confirmedDonorOptions]);
   const inventoryDonorsForSelectedBloodType = useMemo(() => {
     const selectedBloodType = String(addInventoryModal.bloodType || "").trim();
     if (!selectedBloodType) return [];
 
-    return confirmedDonorOptions.filter((donor) => {
+    return appointmentDonorOptions.filter((donor) => {
       const donorBloodType = String(donor.blood_type || donor.bloodType || "").trim();
       return donorBloodType === selectedBloodType;
     });
-  }, [addInventoryModal.bloodType, confirmedDonorOptions]);
+  }, [addInventoryModal.bloodType, appointmentDonorOptions]);
+  const selectedInventoryDonor = useMemo(() => {
+    if (!addInventoryModal.donorId) return null;
+    return appointmentDonorOptions.find((donor) => Number(donor.donor_id || donor.id) === Number(addInventoryModal.donorId)) || null;
+  }, [addInventoryModal.donorId, appointmentDonorOptions]);
+  const addInventoryComponentRows = useMemo(() => (
+    Array.isArray(addInventoryModal.componentRows) ? addInventoryModal.componentRows : []
+  ), [addInventoryModal.componentRows]);
+  const addInventoryTotalUnits = useMemo(() => (
+    addInventoryComponentRows.reduce((sum, row) => sum + (Number.parseInt(row.quantity, 10) || 0), 0)
+  ), [addInventoryComponentRows]);
+  const addInventoryTypicalYieldWarning = useMemo(() => {
+    if (addInventoryTotalUnits <= 4) return "";
+    return `Typical yield from one donation is usually around 3-4 bags. You are adding ${addInventoryTotalUnits} bags.`;
+  }, [addInventoryTotalUnits]);
 
   useEffect(() => {
     const parsed = getStoredUser();
-    if (!parsed?.token) { navigate("/login"); return; }
-    if (parsed.role !== "staff" && parsed.role !== "admin") { navigate("/"); return; }
+    if (!parsed?.token) { clearAuthSession(); navigate("/login", { replace: true }); return; }
+    if (parsed.role !== "staff" && parsed.role !== "admin") { clearAuthSession(); navigate("/", { replace: true }); return; }
     setUser(parsed);
   }, [navigate]);
 
@@ -255,6 +347,12 @@ export default function StaffDashboard() {
       const res = await authFetch(`backend/api/get_staff_dashboard.php?_ts=${Date.now()}`, {
         cache: "no-store",
       });
+      if (res.status === 401 || res.status === 403) {
+        clearAuthSession();
+        setActionError("Your session has expired. Returning to home.");
+        navigate("/", { replace: true });
+        return;
+      }
       const data = await parseApiJson(res);
       if (data.success) {
         setStats(data.stats || DEFAULT_STATS);
@@ -263,6 +361,7 @@ export default function StaffDashboard() {
         setLabUseLogs(Array.isArray(data.labLogs) ? data.labLogs : []);
         setIssueLogs(Array.isArray(data.issueLogs) ? data.issueLogs : []);
         setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
+        setUnreadNotificationCount(Number(data.notificationsUnreadCount ?? 0));
 
         const urgentCount = Array.isArray(data.urgentRequests) ? data.urgentRequests.length : 0;
         const lowStockCount = Array.isArray(data.lowStockItems) ? data.lowStockItems.length : 0;
@@ -275,7 +374,7 @@ export default function StaffDashboard() {
           const alertParts = [];
           
           // Add expiry alerts
-          if (expiredUnits > 0 || expiringSoonUnits > 0) {
+          if (!expiryNoticeShownRef.current && (expiredUnits > 0 || expiringSoonUnits > 0)) {
             const expiryParts = [];
             if (expiredUnits > 0) {
               expiryParts.push(`${expiredUnits} expired unit(s)`);
@@ -283,7 +382,10 @@ export default function StaffDashboard() {
             if (expiringSoonUnits > 0) {
               expiryParts.push(`${expiringSoonUnits} unit(s) expiring within ${expiryWindowDays} day(s)`);
             }
-            alertParts.push(`Expiry alert: ${expiryParts.join(' and ')}`);
+            if (expiryParts.length > 0) {
+              alertParts.push(`Expiry alert: ${expiryParts.join(' and ')}`);
+              expiryNoticeShownRef.current = true;
+            }
           }
           
           // Add low stock alerts (always show if present)
@@ -387,6 +489,34 @@ export default function StaffDashboard() {
 
   const selectedDonation = untestedDonations.find((row) => String(row.donation_id) === String(testForm.donationId)) || null;
 
+  const markNotificationsRead = useCallback(async () => {
+    if (unreadNotificationCount <= 0) return;
+    try {
+      const res = await authFetch("backend/api/mark_notifications_read.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await parseApiJson(res);
+      if (res.ok && data.success) {
+        setUnreadNotificationCount(0);
+        setNotifications((prev) => prev.map((note) => ({ ...note, is_read: 1 })));
+      }
+    } catch (error) {
+      console.error("Unable to mark notifications read:", error);
+    }
+  }, [unreadNotificationCount]);
+
+  const handleMarkAllNotificationsRead = useCallback(async () => {
+    await markNotificationsRead();
+  }, [markNotificationsRead]);
+
+  useEffect(() => {
+    if (isNotificationOpen && unreadNotificationCount > 0) {
+      markNotificationsRead();
+    }
+  }, [isNotificationOpen, unreadNotificationCount, markNotificationsRead]);
+
   const toggleNotifications = useCallback(() => {
     setIsNotificationOpen((prev) => !prev);
   }, []);
@@ -395,9 +525,39 @@ export default function StaffDashboard() {
     setIsNotificationOpen(false);
   }, []);
 
-  const getUnreadNotificationCount = () => notifications.filter((note) => !note?.is_read || note.is_read === 0 || note.is_read === "0").length;
+  const getUnreadNotificationCount = () => unreadNotificationCount;
 
-  const handleLogout = () => { clearAuthSession(); navigate("/login"); };
+  const handleLogout = () => { clearAuthSession(); navigate("/login", { replace: true }); };
+
+  const openProfileEditor = useCallback(async () => {
+    // Navigate to the dedicated staff profile page (full-page editor)
+    navigate('/staff/profile');
+  }, []);
+
+  const closeProfileEditor = useCallback(() => {
+    setShowProfileEditor(false);
+  }, []);
+
+  const handleProfileSave = useCallback((updatedProfile) => {
+    setProfileData(updatedProfile);
+    setShowProfileEditor(false);
+    setUser((prev) => ({
+      ...prev,
+      name: updatedProfile.full_name || prev?.name || "Staff",
+      phone: updatedProfile.phone || prev?.phone,
+      profile_picture: updatedProfile.profile_picture || prev?.profile_picture,
+      date_of_birth: updatedProfile.date_of_birth || prev?.date_of_birth,
+      address: updatedProfile.address || prev?.address,
+      city: updatedProfile.city || prev?.city,
+      dzongkhag: updatedProfile.dzongkhag || prev?.dzongkhag,
+      emergency_contact_name: updatedProfile.emergency_contact_name || prev?.emergency_contact_name,
+      emergency_contact_phone: updatedProfile.emergency_contact_phone || prev?.emergency_contact_phone,
+      assigned_blood_bank: updatedProfile.assigned_blood_bank || prev?.assigned_blood_bank,
+      position: updatedProfile.position || prev?.position,
+      employee_id: updatedProfile.employee_id || prev?.employee_id,
+    }));
+    toast.success('Profile updated successfully.');
+  }, []);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -866,11 +1026,26 @@ export default function StaffDashboard() {
 
   const openAddInventoryModal = useCallback((bloodType) => {
     if (!bloodType) return;
+    addInventoryModeTouchedRef.current = false;
     setAddInventoryModal({
       open: true,
       donationId: "",
+      donationHistoryId: 0,
       donorId: 0,
       bloodType: String(bloodType).trim(),
+      appointmentDate: new Date().toISOString().slice(0, 10),
+      addMode: "local",
+      transferFromBankId: 0,
+      transferToBankId: 0,
+      transferReference: "",
+      transferDate: new Date().toISOString().slice(0, 10),
+      transportMethod: "Ambulance",
+      transferEmail: "",
+      notifySendingBank: true,
+      notifyReceivingBank: true,
+      notifyDoctor: false,
+      notifyDriver: false,
+      componentRows: [createComponentRow()],
       component: "Packed Red Cells",
       expiryDate: "",
       status: "Available",
@@ -878,27 +1053,154 @@ export default function StaffDashboard() {
     setActionError("");
   }, []);
 
+  const closeStockDetailsModal = useCallback(() => {
+    setStockDetailsModal({
+      open: false,
+      bloodType: "",
+      component: "PRBC",
+      stockLevel: "",
+      totalUnits: 0,
+      availableUnitsCount: 0,
+      units: [],
+      loading: false,
+      error: "",
+    });
+  }, []);
+
+  const openStockDetailsModal = useCallback(async (bloodType, component = "PRBC", stockLevel = "", totalUnits = 0) => {
+    const nextBloodType = String(bloodType || "").trim();
+    const nextComponent = String(component || "PRBC").trim() || "PRBC";
+    if (!nextBloodType) return;
+
+    setStockDetailsModal({
+      open: true,
+      bloodType: nextBloodType,
+      component: nextComponent,
+      stockLevel: String(stockLevel || ""),
+      totalUnits: Number(totalUnits) || 0,
+      availableUnitsCount: 0,
+      units: [],
+      loading: true,
+      error: "",
+    });
+
+    try {
+      const res = await authFetch(
+        `backend/api/get_blood_units_by_type.php?blood_type=${encodeURIComponent(nextBloodType)}&component=${encodeURIComponent(nextComponent)}&_ts=${Date.now()}`,
+        { cache: "no-store" },
+      );
+      const data = await parseApiJson(res);
+      if (!res.ok || !data.success) throw new Error(data.message || "Failed to load stock details.");
+
+      const units = Array.isArray(data.units) ? data.units : [];
+      setStockDetailsModal({
+        open: true,
+        bloodType: nextBloodType,
+        component: nextComponent,
+        stockLevel: String(stockLevel || ""),
+        totalUnits: Number(totalUnits) || 0,
+        availableUnitsCount: Number(data.total_units ?? units.length) || units.length,
+        units,
+        loading: false,
+        error: "",
+      });
+    } catch (error) {
+      setStockDetailsModal({
+        open: true,
+        bloodType: nextBloodType,
+        component: nextComponent,
+        stockLevel: String(stockLevel || ""),
+        totalUnits: Number(totalUnits) || 0,
+        availableUnitsCount: 0,
+        units: [],
+        loading: false,
+        error: error.message || "Failed to load stock details.",
+      });
+    }
+  }, []);
+
   const closeAddInventoryModal = useCallback(() => {
+    addInventoryModeTouchedRef.current = false;
     setAddInventoryModal({
       open: false,
       donationId: "",
+      donationHistoryId: 0,
       donorId: 0,
       bloodType: "",
+      appointmentDate: new Date().toISOString().slice(0, 10),
+      addMode: "local",
+      transferFromBankId: 0,
+      transferToBankId: 0,
+      transferReference: "",
+      transferDate: new Date().toISOString().slice(0, 10),
+      transportMethod: "Ambulance",
+      transferEmail: "",
+      notifySendingBank: true,
+      notifyReceivingBank: true,
+      notifyDoctor: false,
+      notifyDriver: false,
+      componentRows: [createComponentRow()],
       component: "Packed Red Cells",
       expiryDate: "",
       status: "Available",
     });
+    setAppointmentDonors([]);
+    setAppointmentDonorsError("");
+    setBloodBanks([]);
+    setBloodBanksError("");
   }, []);
 
   const handleInventoryModalChange = useCallback((field, value) => {
     setAddInventoryModal((prev) => {
+      if (field === "addMode") {
+        addInventoryModeTouchedRef.current = true;
+        return {
+          ...prev,
+          addMode: value === "transfer" ? "transfer" : "local",
+          donorId: value === "transfer" ? 0 : prev.donorId,
+          donationId: value === "transfer" ? "" : prev.donationId,
+          donationHistoryId: value === "transfer" ? 0 : prev.donationHistoryId,
+          transferToBankId: value === "transfer" ? (prev.transferToBankId || 0) : prev.transferToBankId,
+        };
+      }
+
+      if (field === "appointmentDate") {
+        return {
+          ...prev,
+          appointmentDate: value,
+          donorId: 0,
+          donationId: "",
+          donationHistoryId: 0,
+        };
+      }
+
       if (field === "donorId") {
-        const selectedDonor = confirmedDonors.find((donor) => Number(donor.id) === Number(value)) || null;
+        const selectedDonor = appointmentDonorOptions.find((donor) => Number(donor.donor_id || donor.id) === Number(value)) || null;
+        const selectedDonationId = selectedDonor?.donation_id ? String(selectedDonor.donation_id).trim() : "";
+        const selectedDonationHistoryId = Number(selectedDonor?.donation_history_id || 0);
         return {
           ...prev,
           donorId: Number(value) || 0,
           bloodType: selectedDonor?.blood_type ? String(selectedDonor.blood_type).trim() : prev.bloodType,
+          donationId: selectedDonationId,
+          donationHistoryId: selectedDonationHistoryId,
         };
+      }
+
+      if (field === "transferFromBankId") {
+        return { ...prev, transferFromBankId: Number(value) || 0 };
+      }
+
+      if (field === "transferToBankId") {
+        return { ...prev, transferToBankId: Number(value) || 0 };
+      }
+
+      if (field === "transferEmail") {
+        return { ...prev, transferEmail: value };
+      }
+
+      if (field === "notifySendingBank" || field === "notifyReceivingBank" || field === "notifyDoctor" || field === "notifyDriver") {
+        return { ...prev, [field]: Boolean(value) };
       }
 
       if (field === "bloodType") {
@@ -907,7 +1209,53 @@ export default function StaffDashboard() {
 
       return { ...prev, [field]: value };
     });
-  }, [confirmedDonors]);
+  }, [appointmentDonorOptions]);
+
+  const handleComponentRowChange = useCallback((rowId, field, value) => {
+    setAddInventoryModal((prev) => ({
+      ...prev,
+      componentRows: (Array.isArray(prev.componentRows) ? prev.componentRows : []).map((row) => {
+        if (row.id !== rowId) return row;
+
+        if (field === "component") {
+          const componentValue = String(value || "Packed Red Cells");
+          return {
+            ...row,
+            component: componentValue,
+            expiryDate: getSuggestedExpiryDate(componentValue),
+          };
+        }
+
+        if (field === "quantity") {
+          const nextQuantity = String(value || "").trim();
+          return { ...row, quantity: nextQuantity === "" ? "" : Math.max(1, Number.parseInt(nextQuantity, 10) || 1) };
+        }
+
+        return { ...row, [field]: value };
+      }),
+    }));
+  }, []);
+
+  const handleAddComponentRow = useCallback(() => {
+    setAddInventoryModal((prev) => ({
+      ...prev,
+      componentRows: [...(Array.isArray(prev.componentRows) ? prev.componentRows : []), createComponentRow()],
+    }));
+  }, []);
+
+  const handleRemoveComponentRow = useCallback((rowId) => {
+    setAddInventoryModal((prev) => {
+      const currentRows = Array.isArray(prev.componentRows) ? prev.componentRows : [];
+      if (currentRows.length <= 1) {
+        return { ...prev, componentRows: [createComponentRow()] };
+      }
+
+      return {
+        ...prev,
+        componentRows: currentRows.filter((row) => row.id !== rowId),
+      };
+    });
+  }, []);
 
   const handleSampleCollectionChange = useCallback((field, value) => {
     setSampleCollectionForm((prev) => ({
@@ -953,12 +1301,12 @@ export default function StaffDashboard() {
 
   useEffect(() => {
     if (!addInventoryModal.open) return;
-    const selectedDonor = confirmedDonors.find((donor) => Number(donor.id) === Number(addInventoryModal.donorId)) || null;
+    const selectedDonor = appointmentDonorOptions.find((donor) => Number(donor.donor_id || donor.id) === Number(addInventoryModal.donorId)) || null;
     const nextBloodType = selectedDonor?.blood_type ? String(selectedDonor.blood_type).trim() : "";
     if (nextBloodType) {
       setAddInventoryModal((prev) => (prev.bloodType === nextBloodType ? prev : { ...prev, bloodType: nextBloodType }));
     }
-  }, [addInventoryModal.open, addInventoryModal.donorId, confirmedDonors]);
+  }, [addInventoryModal.open, addInventoryModal.donorId, appointmentDonorOptions]);
 
   const loadConfirmedDonors = useCallback(async () => {
     setConfirmedDonorsLoading(true);
@@ -980,6 +1328,78 @@ export default function StaffDashboard() {
     }
   }, []);
 
+  const loadBloodBanks = useCallback(async (bloodType) => {
+    setBloodBanksLoading(true);
+    setBloodBanksError("");
+    try {
+      const res = await authFetch(`backend/api/get_blood_banks.php?_ts=${Date.now()}`, { cache: "no-store" });
+      const json = await parseApiJson(res);
+      if (json.success && Array.isArray(json.data)) {
+        setBloodBanks(json.data);
+        setAddInventoryModal((prev) => {
+          if (prev.addMode !== "transfer" || prev.transferFromBankId || json.data.length === 0) {
+            return prev;
+          }
+          return { ...prev, transferFromBankId: Number(json.data[0]?.id) || 0 };
+        });
+      } else {
+        setBloodBanks([]);
+        setBloodBanksError(json.message || "Failed to load blood banks.");
+      }
+    } catch {
+      setBloodBanks([]);
+      setBloodBanksError("Failed to load blood banks.");
+    } finally {
+      setBloodBanksLoading(false);
+    }
+  }, []);
+
+  const loadAppointmentDonors = useCallback(async (appointmentDate) => {
+    const dateValue = String(appointmentDate || "").trim();
+    if (!dateValue) {
+      setAppointmentDonors([]);
+      return;
+    }
+
+    setAppointmentDonorsLoading(true);
+    setAppointmentDonorsError("");
+    try {
+      const res = await authFetch(`backend/api/get_appointment_donors.php?appointment_date=${encodeURIComponent(dateValue)}&_ts=${Date.now()}`, { cache: 'no-store' });
+      const json = await parseApiJson(res);
+      if (json.success && Array.isArray(json.data)) {
+        setAppointmentDonors(json.data);
+        if (!json.data.length && json.message) {
+          setAppointmentDonorsError(json.message);
+        }
+        if (!addInventoryModeTouchedRef.current) {
+          setAddInventoryModal((prev) => ({
+            ...prev,
+            addMode: json.data.length > 0 ? "local" : "transfer",
+            donorId: json.data.length > 0 ? prev.donorId : 0,
+          }));
+        }
+      } else {
+        setAppointmentDonors([]);
+        setAppointmentDonorsError(json.message || 'Failed to load completed donations.');
+        if (!addInventoryModeTouchedRef.current) {
+          setAddInventoryModal((prev) => ({ ...prev, addMode: "transfer", donorId: 0 }));
+        }
+      }
+    } catch {
+      setAppointmentDonors([]);
+      setAppointmentDonorsError('Failed to load completed donations.');
+      if (!addInventoryModeTouchedRef.current) {
+        setAddInventoryModal((prev) => ({ ...prev, addMode: "transfer", donorId: 0 }));
+      }
+    } finally {
+      setAppointmentDonorsLoading(false);
+    }
+  }, []);
+
+  const refreshSampleData = useCallback(async () => {
+    await Promise.all([loadSampleRecords(), loadConfirmedDonors()]);
+  }, [loadSampleRecords, loadConfirmedDonors]);
+
   // Load confirmed donors for both sample workflow and unit creation.
   useEffect(() => {
     if (user) {
@@ -993,20 +1413,79 @@ export default function StaffDashboard() {
     loadConfirmedDonors();
   }, [addInventoryModal.open, loadConfirmedDonors, user]);
 
+  useEffect(() => {
+    if (!addInventoryModal.open || !user) return;
+    loadBloodBanks(addInventoryModal.bloodType);
+  }, [addInventoryModal.bloodType, addInventoryModal.open, loadBloodBanks, user]);
+
+  useEffect(() => {
+    if (!addInventoryModal.open || !user) return;
+    loadAppointmentDonors(addInventoryModal.appointmentDate);
+  }, [addInventoryModal.appointmentDate, addInventoryModal.open, loadAppointmentDonors, user]);
+
+  useEffect(() => {
+    if (!addInventoryModal.open) return;
+    if (addInventoryModal.donorId && !appointmentDonorOptions.some((donor) => Number(donor.donor_id || donor.id) === Number(addInventoryModal.donorId))) {
+      setAddInventoryModal((prev) => ({ ...prev, donorId: 0, donationId: "", donationHistoryId: 0 }));
+    }
+  }, [addInventoryModal.donorId, addInventoryModal.open, appointmentDonorOptions]);
+
+  // Keep Samples tab data fresh when user opens it.
+  useEffect(() => {
+    if (!user || activeTab !== "samples") return;
+    refreshSampleData();
+  }, [activeTab, refreshSampleData, user]);
+
   const handleAddInventorySubmit = useCallback(async (event) => {
     event.preventDefault();
     const bloodType = addInventoryModal.bloodType;
-    const donationId = String(addInventoryModal.donationId || "").trim();
-    const component = String(addInventoryModal.component || "Packed Red Cells").trim();
-    const expiryDate = String(addInventoryModal.expiryDate || "").trim();
+    const isTransfer = addInventoryModal.addMode === "transfer";
+    const donationId = isTransfer ? String(addInventoryModal.transferReference || "").trim() : String(addInventoryModal.donationId || "").trim();
+    const componentRows = Array.isArray(addInventoryModal.componentRows) ? addInventoryModal.componentRows : [];
+    const normalizedRows = componentRows.map((row) => ({
+      component: String(row.component || "").trim(),
+      quantity: Number.parseInt(row.quantity, 10) || 0,
+      expiryDate: String(row.expiryDate || "").trim(),
+    }));
+    const totalUnits = normalizedRows.reduce((sum, row) => sum + row.quantity, 0);
 
-    if (!addInventoryModal.donorId) {
-      setActionError("Please select a confirmed donor before adding a unit.");
+    if (!isTransfer && !addInventoryModal.donorId) {
+      setActionError("Please select a donor with a completed donation before adding units.");
       return;
     }
-    if (!bloodType || !expiryDate) {
-      setActionError("Please fill all required fields: Expiry Date.");
+    if (!isTransfer && !addInventoryModal.donationHistoryId) {
+      setActionError("No completed donations found. Please complete an appointment first.");
       return;
+    }
+    if (!bloodType) {
+      setActionError("Please select a blood group before adding units.");
+      return;
+    }
+    if (normalizedRows.length === 0) {
+      setActionError("Please add at least one component row.");
+      return;
+    }
+    if (normalizedRows.some((row) => !row.component || !row.expiryDate || row.quantity < 1)) {
+      setActionError("Each component row needs a component type, quantity of at least 1, and an expiry date.");
+      return;
+    }
+    if (totalUnits < 1) {
+      setActionError("Please add at least one unit.");
+      return;
+    }
+    if (isTransfer) {
+      if (!addInventoryModal.transferFromBankId) {
+        setActionError("Please select the sending blood bank.");
+        return;
+      }
+      if (!donationId) {
+        setActionError("Please enter the transfer reference number.");
+        return;
+      }
+      if (!String(addInventoryModal.transferDate || "").trim()) {
+        setActionError("Please enter the transfer date.");
+        return;
+      }
     }
 
     const key = `unit-${donationId}`;
@@ -1017,10 +1496,25 @@ export default function StaffDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           donationId,
-          donorId: addInventoryModal.donorId,
+          donorId: isTransfer ? 0 : addInventoryModal.donorId,
+          donationHistoryId: isTransfer ? 0 : addInventoryModal.donationHistoryId,
           bloodType: bloodType.trim(),
-          component,
-          expiryDate,
+          component: normalizedRows[0]?.component || "Packed Red Cells",
+          expiryDate: normalizedRows[0]?.expiryDate || "",
+          quantity: normalizedRows[0]?.quantity || 1,
+          components: normalizedRows,
+          addMode: addInventoryModal.addMode,
+          bloodBankId: isTransfer ? (addInventoryModal.transferToBankId || 1) : 1,
+          transferFromBankId: addInventoryModal.transferFromBankId,
+          transferToBankId: addInventoryModal.transferToBankId,
+          transferReference: addInventoryModal.transferReference,
+          transferDate: addInventoryModal.transferDate,
+          transportMethod: addInventoryModal.transportMethod,
+          transferEmail: addInventoryModal.transferEmail,
+          notifySendingBank: addInventoryModal.notifySendingBank,
+          notifyReceivingBank: addInventoryModal.notifyReceivingBank,
+          notifyDoctor: addInventoryModal.notifyDoctor,
+          notifyDriver: addInventoryModal.notifyDriver,
           status: "Available",
         }),
       });
@@ -1037,7 +1531,7 @@ export default function StaffDashboard() {
       }
 
       setActionError("");
-      setPopupNotice(`Blood unit added for ${bloodType}.`);
+      setPopupNotice(`Blood units added for ${bloodType} (${totalUnits} bag${totalUnits === 1 ? "" : "s"}).`);
       closeAddInventoryModal();
       await loadDashboard();
     } catch (error) {
@@ -1081,7 +1575,35 @@ export default function StaffDashboard() {
       const donorName = data?.data?.donorName || "donor";
       const formattedDate = collectionDate;
       const formattedTime = sampleCollectionForm.collectionTime;
-      const notificationMessage = `Dear ${donorName}, your SAMPLE COLLECTION appointment has been confirmed. ⚠️ This is a SMALL blood sample (about 5ml) for testing. We will test for HIV, Hepatitis, Malaria, etc. 📍 Blood Bank: National Blood Bank, Thimphu. 📅 Date: ${formattedDate}. ⏰ Time: ${formattedTime}. Results will be ready in 2-3 days. You will be notified when results are available.`;
+      const notificationMessage = `SAMPLE COLLECTION APPOINTMENT CONFIRMED
+
+    Dear ${donorName},
+
+    Your sample collection appointment has been confirmed.
+
+    This is a small blood sample (about 5ml) for testing.
+    We will test for:
+
+    HIV
+
+    Hepatitis B & C
+
+    Syphilis
+
+    Malaria
+
+    ...and many more.
+
+    Blood Bank: National Blood Bank, Thimphu
+    Date: ${formattedDate}
+    Time: ${formattedTime}
+
+    Please eat a light meal before coming. If you cannot attend, please inform us at least 24 hours in advance.
+
+    Thank you for your cooperation.
+
+    Regards,
+    Blood Transfusion Services`;
 
       setActionError("");
       setPopupNotice(`Sample collection appointment confirmed for ${donorName}.`);
@@ -1307,6 +1829,16 @@ export default function StaffDashboard() {
   const initials = user?.name
     ? user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
     : "?";
+  const staffProfileFromStorage = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem("dev_staff_profile");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const staffAvatarSrc = user?.profile_picture || getStoredUser()?.profile_picture || staffProfileFromStorage?.profile_picture || "";
 
   if (!user) return null;
 
@@ -1320,43 +1852,35 @@ export default function StaffDashboard() {
             🩸 Blood Transfusion Services — Staff
           </div>
           <div className="staff-user-actions">
-            <div className="staff-notification-wrap">
-              <button
-                ref={notificationButtonRef}
-                type="button"
-                className={`staff-notification-badge ${getUnreadNotificationCount() > 0 ? "unread" : ""}`}
-                onClick={toggleNotifications}
-                aria-label={`Notifications (${notifications.length})`}
-                aria-expanded={isNotificationOpen}
-                aria-haspopup="menu"
-              >
-                🔔
-                <span className="staff-notification-count">{notifications.length}</span>
-              </button>
-
-              {isNotificationOpen && notifications.length > 0 && (
-                <section className="staff-notification-dropdown" ref={notificationPanelRef} role="menu" aria-label="Recent notifications">
-                  <h3>Recent Notifications</h3>
-                  <ul>
-                    {notifications.slice(0, 5).map((note) => (
-                      <li key={note.id} className={`severity-${String(note.severity || "info").toLowerCase()}`}>
-                        <strong>{note.title}:</strong> {note.message}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-            </div>
-            <div className="staff-user-pill">
-              <div className="avatar">{initials}</div>
+            <NotificationBar
+              mode="compact"
+              role="staff"
+              notifications={notifications}
+              unreadCount={unreadNotificationCount}
+              onMarkAllRead={handleMarkAllNotificationsRead}
+              onOpenNotifications={toggleNotifications}
+            />
+            <button className="staff-user-pill" type="button" onClick={openProfileEditor} title="Edit profile">
+              <div className="avatar">
+                {staffAvatarSrc ? <img src={staffAvatarSrc} alt={user.name || 'Staff'} /> : initials}
+              </div>
               {user.name}
-            </div>
+            </button>
             <button className="staff-logout-btn" onClick={handleLogout}>Logout</button>
           </div>
         </div>
       </header>
 
+      
+
       <main className="staff-main">
+        {showProfileEditor && profileData && (
+          <EditProfile
+            profile={profileData}
+            onSave={handleProfileSave}
+            onCancel={closeProfileEditor}
+          />
+        )}
 
         <section className="staff-hero">
           <h1>Blood Bank Staff Dashboard</h1>
@@ -1559,7 +2083,16 @@ export default function StaffDashboard() {
                       <td>{row.platelets_units}</td>
                       <td>{row.ffp_units}</td>
                       <td>{getInventoryTotal(row)}</td>
-                      <td><span className={`tag ${String(row.stock_level || "healthy").toLowerCase()}`}>{row.stock_level}</span></td>
+                      <td>
+                        <button
+                          type="button"
+                          className={`tag ${String(row.stock_level || "healthy").toLowerCase()}`}
+                          style={{ border: "none", cursor: "pointer" }}
+                          onClick={() => openStockDetailsModal(row.blood_type, "PRBC", row.stock_level, getInventoryTotal(row))}
+                        >
+                          {row.stock_level}
+                        </button>
+                      </td>
                       <td>
                         <button type="button" className="staff-table-btn confirm" onClick={() => openAddInventoryModal(row.blood_type)} disabled={busyKey !== ""}>
                           {busyKey === `inv-${row.blood_type}` ? "Updating…" : "Add Units"}
@@ -1765,6 +2298,11 @@ export default function StaffDashboard() {
                       No pending donor samples were found. Refresh samples or collect a new sample first.
                     </div>
                   )}
+                  {confirmedDonorsError && (
+                    <div className="staff-modal-hint" style={{ color: '#b45309', marginTop: 8 }}>
+                      {confirmedDonorsError}
+                    </div>
+                  )}
                 </div>
 
                 <div className="staff-test-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
@@ -1784,7 +2322,7 @@ export default function StaffDashboard() {
                 </div>
 
                 <div className="staff-test-actions">
-                  <button type="button" className="staff-table-btn default" onClick={loadSampleRecords} disabled={busyKey !== ""}>
+                  <button type="button" className="staff-table-btn default" onClick={refreshSampleData} disabled={busyKey !== ""}>
                     Refresh Samples
                   </button>
                   <button type="submit" className="staff-table-btn confirm" disabled={busyKey !== "" || !sampleCollectionForm.donorId}>
@@ -2146,83 +2684,314 @@ in
 
         {addInventoryModal.open && (
           <div className="staff-modal-backdrop" role="presentation" onClick={closeAddInventoryModal}>
-            <div className="staff-modal" role="dialog" aria-modal="true" aria-labelledby="add-inventory-title" onClick={(e) => e.stopPropagation()}>
+            <div className="staff-modal staff-modal-wide staff-modal-no-scroll" role="dialog" aria-modal="true" aria-labelledby="add-inventory-title" onClick={(e) => e.stopPropagation()}>
               <h3 id="add-inventory-title">Add Blood Unit</h3>
               <p>
                 Blood Group: <strong>{addInventoryModal.bloodType}</strong>
               </p>
+
+              {actionError && (
+                <div style={{
+                  background: '#fee',
+                  border: '1px solid #f99',
+                  borderRadius: '6px',
+                  padding: '12px 16px',
+                  marginBottom: '16px',
+                  fontSize: '14px',
+                  color: '#c00',
+                  fontWeight: '600',
+                  lineHeight: '1.5',
+                  wordWrap: 'break-word'
+                }}>
+                  ⚠️ {actionError}
+                </div>
+              )}
+
               <form onSubmit={handleAddInventorySubmit}>
-                <p className="staff-modal-hint">Record individual blood unit (bag) with donation ID, component type, and expiry date.</p>
+                <p className="staff-modal-hint">Record multiple blood component bags from the same donation in one submission.</p>
 
-                {actionError && (
-                  <div style={{
-                    background: '#fee',
-                    border: '1px solid #f99',
-                    borderRadius: '6px',
-                    padding: '10px 12px',
-                    marginBottom: '12px',
-                    fontSize: '13px',
-                    color: '#c00',
-                    fontWeight: '500'
-                  }}>
-                    {actionError}
+                <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+                  <label style={{ margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="radio"
+                      name="add-blood-mode"
+                      checked={addInventoryModal.addMode === "local"}
+                      onChange={() => handleInventoryModalChange("addMode", "local")}
+                    />
+                    Local Donation
+                  </label>
+                  <label style={{ margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="radio"
+                      name="add-blood-mode"
+                      checked={addInventoryModal.addMode === "transfer"}
+                      onChange={() => handleInventoryModalChange("addMode", "transfer")}
+                    />
+                    Transfer from another dzongkhag
+                  </label>
+                </div>
+
+                {addInventoryModal.addMode === "transfer" && addInventoryModal.bloodType && inventoryDonorsForSelectedBloodType.length === 0 && (
+                  <div className="staff-modal-hint" style={{ color: '#b45309', marginBottom: 8 }}>
+                    No completed donations found. Please complete an appointment first.
                   </div>
                 )}
 
-                <label htmlFor="inventory-donation-id">Donation ID (optional)</label>
-                <input
-                  id="inventory-donation-id"
-                  value={addInventoryModal.donationId}
-                  onChange={(e) => handleInventoryModalChange("donationId", e.target.value)}
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  placeholder="Leave blank to add without linking a donation"
-                />
+                {addInventoryModal.addMode === "local" ? (
+                  <>
+                    <label htmlFor="inventory-appointment-date">Appointment Date <span className="required">*</span></label>
+                    <input
+                      id="inventory-appointment-date"
+                      type="date"
+                      value={addInventoryModal.appointmentDate}
+                      onChange={(e) => handleInventoryModalChange("appointmentDate", e.target.value)}
+                      required
+                    />
 
-                <label htmlFor="inventory-donor">Select Donor <span className="required">*</span></label>
-                <select
-                  id="inventory-donor"
-                  value={addInventoryModal.donorId || ""}
-                  onChange={(e) => handleInventoryModalChange('donorId', Number(e.target.value))}
-                  required
-                  disabled={confirmedDonorsLoading}
-                >
-                  <option value="">-- Select confirmed donor --</option>
-                  {inventoryDonorsForSelectedBloodType.map((d) => (
-                    <option key={`donor-${d.id}`} value={d.id}>{d.full_name || d.name || `Donor ${d.id}`} [{d.blood_type || '—'}]</option>
+                    <label htmlFor="inventory-donor">Select Donor <span className="required">*</span></label>
+                    <select
+                      id="inventory-donor"
+                      value={addInventoryModal.donorId || ""}
+                      onChange={(e) => handleInventoryModalChange('donorId', Number(e.target.value))}
+                      required
+                      disabled={appointmentDonorsLoading}
+                    >
+                      <option value="">-- Donors with completed donations on {addInventoryModal.appointmentDate} --</option>
+                      {inventoryDonorsForSelectedBloodType.map((d) => {
+                        const donorId = d.donor_id || d.id;
+                        const donorName = d.full_name || d.donor_name || d.name || `Donor ${donorId}`;
+                        const appointmentTime = d.appointment_time ? ` - ${d.appointment_time}` : "";
+                        const appointmentStatus = d.appointment_status ? ` (${d.appointment_status})` : "";
+                        return (
+                          <option key={`donor-${donorId}-${d.appointment_id || donorId}`} value={donorId}>
+                            {donorName} [{d.blood_type || '—'}]{appointmentTime}{appointmentStatus}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {appointmentDonorsLoading && <div className="staff-modal-hint">Loading completed donations for the selected date...</div>}
+                    {!appointmentDonorsLoading && addInventoryModal.bloodType && inventoryDonorsForSelectedBloodType.length === 0 && (
+                      <div className="staff-modal-hint" style={{ color: '#b45309' }}>
+                        No completed donations found. Please complete an appointment first.
+                      </div>
+                    )}
+                    {appointmentDonorsError && <div className="staff-modal-hint" style={{ color: '#b45309' }}>{appointmentDonorsError}</div>}
+
+                    <label htmlFor="inventory-donation-id">Donation Record ID</label>
+                    <input
+                      id="inventory-donation-id"
+                      value={addInventoryModal.donationId}
+                      type="text"
+                      readOnly
+                      aria-readonly="true"
+                      placeholder="Auto-linked from completed donation"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <label htmlFor="inventory-transfer-bank">From Blood Bank <span className="required">*</span></label>
+                    <select
+                      id="inventory-transfer-bank"
+                      value={addInventoryModal.transferFromBankId || ""}
+                      onChange={(e) => handleInventoryModalChange("transferFromBankId", e.target.value)}
+                      required
+                      disabled={bloodBanksLoading}
+                    >
+                      <option value="">-- Select sending bank --</option>
+                      {bloodBanks.map((bank) => {
+                        const requestedBt = String(addInventoryModal.bloodType || "").trim();
+                        const btUnits = requestedBt && bank.inventory && (bank.inventory[requestedBt] !== undefined)
+                          ? bank.inventory[requestedBt]
+                          : (bank.total_available_units !== undefined ? bank.total_available_units : 0);
+                        return (
+                          <option key={bank.id} value={bank.id}>
+                            {bank.name} {bank.dzongkhag ? `(${bank.dzongkhag})` : ""}{requestedBt ? ` - ${requestedBt}: ${btUnits} units` : (bank.total_available_units !== undefined ? ` - ${bank.total_available_units} units` : "")}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {bloodBanksLoading && <div className="staff-modal-hint">Loading blood banks...</div>}
+                    {bloodBanksError && <div className="staff-modal-hint" style={{ color: '#b45309' }}>{bloodBanksError}</div>}
+
+                    <label htmlFor="inventory-transfer-to-bank">To Blood Bank <span className="required">*</span></label>
+                    <select
+                      id="inventory-transfer-to-bank"
+                      value={addInventoryModal.transferToBankId || ""}
+                      onChange={(e) => handleInventoryModalChange("transferToBankId", e.target.value)}
+                      required
+                      disabled={bloodBanksLoading}
+                    >
+                      <option value="">-- Select receiving bank --</option>
+                      {bloodBanks.map((bank) => {
+                        const requestedBt = String(addInventoryModal.bloodType || "").trim();
+                        const btUnits = requestedBt && bank.inventory && (bank.inventory[requestedBt] !== undefined)
+                          ? bank.inventory[requestedBt]
+                          : (bank.total_available_units !== undefined ? bank.total_available_units : 0);
+                        return (
+                          <option key={`to-${bank.id}`} value={bank.id}>
+                            {bank.name} {bank.dzongkhag ? `(${bank.dzongkhag})` : ""}{requestedBt ? ` - ${requestedBt}: ${btUnits} units` : (bank.total_available_units !== undefined ? ` - ${bank.total_available_units} units` : "")}
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    <label htmlFor="inventory-transfer-reference">Transfer Reference Number <span className="required">*</span></label>
+                    <input
+                      id="inventory-transfer-reference"
+                      type="text"
+                      value={addInventoryModal.transferReference}
+                      onChange={(e) => handleInventoryModalChange("transferReference", e.target.value)}
+                      placeholder="TR-2024-00123"
+                      required
+                    />
+
+                    <div className="staff-test-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+                      <div>
+                        <label htmlFor="inventory-transfer-date">Transfer Date <span className="required">*</span></label>
+                        <input
+                          id="inventory-transfer-date"
+                          type="date"
+                          value={addInventoryModal.transferDate}
+                          onChange={(e) => handleInventoryModalChange("transferDate", e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="inventory-transport-method">Transport Method</label>
+                        <select
+                          id="inventory-transport-method"
+                          value={addInventoryModal.transportMethod}
+                          onChange={(e) => handleInventoryModalChange("transportMethod", e.target.value)}
+                        >
+                          <option value="Ambulance">Ambulance</option>
+                          <option value="Courier">Courier</option>
+                          <option value="Hospital Vehicle">Hospital Vehicle</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <label htmlFor="inventory-transfer-email">Optional Email for Notification</label>
+                    <input
+                      id="inventory-transfer-email"
+                      type="email"
+                      value={addInventoryModal.transferEmail}
+                      onChange={(e) => handleInventoryModalChange("transferEmail", e.target.value)}
+                      placeholder="bank@example.com"
+                    />
+
+                    <div style={{ marginTop: 12 }}>
+                      <div className="staff-modal-hint" style={{ marginBottom: 8 }}>Notify</div>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginRight: 16 }}>
+                        <input type="checkbox" checked={addInventoryModal.notifySendingBank} onChange={(e) => handleInventoryModalChange("notifySendingBank", e.target.checked)} />
+                        Sending Bank
+                      </label>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginRight: 16 }}>
+                        <input type="checkbox" checked={addInventoryModal.notifyReceivingBank} onChange={(e) => handleInventoryModalChange("notifyReceivingBank", e.target.checked)} />
+                        Receiving Bank
+                      </label>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginRight: 16 }}>
+                        <input type="checkbox" checked={addInventoryModal.notifyDoctor} onChange={(e) => handleInventoryModalChange("notifyDoctor", e.target.checked)} />
+                        Doctor
+                      </label>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <input type="checkbox" checked={addInventoryModal.notifyDriver} onChange={(e) => handleInventoryModalChange("notifyDriver", e.target.checked)} />
+                        Driver
+                      </label>
+                    </div>
+                  </>
+                )}
+
+                <div className="inventory-summary-strip">
+                  <div>
+                    <span>Donor</span>
+                    <strong>{selectedInventoryDonor ? `${selectedInventoryDonor.full_name || selectedInventoryDonor.donor_name || selectedInventoryDonor.name || `Donor ${selectedInventoryDonor.donor_id || selectedInventoryDonor.id}`}` : (addInventoryModal.addMode === "transfer" ? "Transfer record" : "Select a donor")}</strong>
+                  </div>
+                  <div>
+                    <span>Blood Group</span>
+                    <strong>{addInventoryModal.bloodType || "—"}</strong>
+                  </div>
+                  <div>
+                    <span>Total Units</span>
+                    <strong>{addInventoryTotalUnits} bag{addInventoryTotalUnits === 1 ? "" : "s"}</strong>
+                  </div>
+                </div>
+
+                <div className="inventory-component-table" role="table" aria-label="Blood component rows">
+                  <div className="inventory-component-header" role="row">
+                    <span role="columnheader">Component Type</span>
+                    <span role="columnheader">Qty (bags)</span>
+                    <span role="columnheader">Expiry Date</span>
+                    <span role="columnheader">Action</span>
+                  </div>
+
+                  {addInventoryComponentRows.map((row, index) => (
+                    <div key={row.id} className="inventory-component-row" role="row">
+                      <div>
+                        <label htmlFor={`inventory-component-${row.id}`}>Component Type</label>
+                        <select
+                          id={`inventory-component-${row.id}`}
+                          value={row.component}
+                          onChange={(e) => handleComponentRowChange(row.id, "component", e.target.value)}
+                          required
+                        >
+                          {COMPONENT_TYPE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor={`inventory-quantity-${row.id}`}>Qty (bags)</label>
+                        <input
+                          id={`inventory-quantity-${row.id}`}
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={row.quantity}
+                          onChange={(e) => handleComponentRowChange(row.id, "quantity", e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor={`inventory-expiry-${row.id}`}>Expiry Date</label>
+                        <input
+                          id={`inventory-expiry-${row.id}`}
+                          type="date"
+                          value={row.expiryDate}
+                          onChange={(e) => handleComponentRowChange(row.id, "expiryDate", e.target.value)}
+                          required
+                        />
+                        <div className="staff-modal-hint inventory-expiry-hint">
+                          Suggested: {getSuggestedExpiryDate(row.component)}
+                        </div>
+                      </div>
+
+                      <div className="inventory-row-actions">
+                        <button
+                          type="button"
+                          className="staff-table-btn default"
+                          onClick={() => handleRemoveComponentRow(row.id)}
+                          disabled={addInventoryComponentRows.length === 1}
+                        >
+                          Remove Row
+                        </button>
+                      </div>
+                    </div>
                   ))}
-                </select>
-                {confirmedDonorsLoading && <div className="staff-modal-hint">Loading sample-cleared donors...</div>}
-                {!confirmedDonorsLoading && addInventoryModal.bloodType && inventoryDonorsForSelectedBloodType.length === 0 && (
-                  <div className="staff-modal-hint" style={{ color: '#b45309' }}>
-                    No confirmed donors found for {addInventoryModal.bloodType}.
+
+                  <button type="button" className="staff-table-btn default inventory-add-row-btn" onClick={handleAddComponentRow}>
+                    + Add Component Row
+                  </button>
+                </div>
+
+                {addInventoryTypicalYieldWarning && (
+                  <div className="inventory-warning">
+                    {addInventoryTypicalYieldWarning}
                   </div>
                 )}
-                {confirmedDonorsError && <div className="staff-modal-hint" style={{ color: '#b45309' }}>{confirmedDonorsError}</div>}
-
-                <label htmlFor="inventory-component">Component Type</label>
-                <select
-                  id="inventory-component"
-                  value={addInventoryModal.component}
-                  onChange={(e) => handleInventoryModalChange("component", e.target.value)}
-                >
-                  <option value="Whole Blood">Whole Blood</option>
-                  <option value="Packed Red Cells">Packed Red Cells (PRBC)</option>
-                  <option value="Platelets">Platelets</option>
-                  <option value="Plasma">Plasma</option>
-                  <option value="FFP">Fresh Frozen Plasma (FFP)</option>
-                  <option value="Cryoprecipitate">Cryoprecipitate</option>
-                </select>
-
-                <label htmlFor="inventory-expiry">Expiry Date <span className="required">*</span></label>
-                <input
-                  id="inventory-expiry"
-                  type="date"
-                  value={addInventoryModal.expiryDate}
-                  onChange={(e) => handleInventoryModalChange("expiryDate", e.target.value)}
-                  required
-                />
 
                 <label htmlFor="inventory-blood-type">Blood Group (Pre-filled)</label>
                 <input
@@ -2249,10 +3018,84 @@ in
                     Cancel
                   </button>
                   <button type="submit" className="staff-table-btn confirm" disabled={busyKey !== ""}>
-                    {busyKey && busyKey.startsWith("unit-") ? "Adding…" : "Add Unit"}
+                    {busyKey && busyKey.startsWith("unit-") ? "Adding…" : `Add ${addInventoryTotalUnits || 0} Unit${addInventoryTotalUnits === 1 ? "" : "s"}`}
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {stockDetailsModal.open && (
+          <div className="staff-modal-backdrop" role="presentation" onClick={closeStockDetailsModal}>
+            <div className="staff-modal" role="dialog" aria-modal="true" aria-labelledby="stock-details-modal-title" onClick={(e) => e.stopPropagation()}>
+              <h3 id="stock-details-modal-title">
+                {stockDetailsModal.bloodType} {stockDetailsModal.component} Stock Details
+              </h3>
+
+              {stockDetailsModal.loading ? (
+                <p className="staff-modal-hint">Loading stock details...</p>
+              ) : stockDetailsModal.error ? (
+                <div className="staff-modal-hint" style={{ color: '#b45309' }}>
+                  {stockDetailsModal.error}
+                </div>
+              ) : (
+                <>
+                  <p className="staff-modal-hint" style={{ marginBottom: 12 }}>
+                    Current stock level: <strong>{stockDetailsModal.stockLevel || '—'}</strong><br />
+                    Total units: <strong>{stockDetailsModal.totalUnits}</strong>
+                  </p>
+
+                  {stockDetailsModal.units.length === 0 ? (
+                    <p className="staff-modal-hint">No available units found for this blood type and component.</p>
+                  ) : (
+                    <div className="staff-table-wrap" style={{ maxHeight: 420, overflow: 'auto' }}>
+                      <table className="staff-table">
+                        <thead>
+                          <tr>
+                            <th>Donation ID</th>
+                            <th>Expiry Date</th>
+                            <th>Days Left</th>
+                            <th>Status Badge</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stockDetailsModal.units.map((unit) => {
+                            const daysLeft = Number(unit.days_left);
+                            const isCritical = Number.isFinite(daysLeft) && daysLeft <= 3;
+                            const isSoon = Number.isFinite(daysLeft) && daysLeft > 3 && daysLeft <= 7;
+                            const rowStyle = isCritical
+                              ? { background: '#fee2e2' }
+                              : isSoon
+                                ? { background: '#fef3c7' }
+                                : {};
+                            const badgeClass = isCritical ? 'rejected' : isSoon ? 'pending' : 'approved';
+                            const badgeLabel = isCritical
+                              ? 'Expiring Soon'
+                              : isSoon
+                                ? 'Expiring Soon'
+                                : 'Available';
+                            return (
+                              <tr key={`${unit.unit_ref || unit.donation_id || unit.expiry_date}-${unit.id}`} style={rowStyle}>
+                                <td>{unit.donation_id || '—'}</td>
+                                <td>{unit.expiry_date || '—'}</td>
+                                <td>{formatExpiryDays(unit.days_left)}</td>
+                                <td><span className={`tag ${badgeClass}`}>{badgeLabel}</span></td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="staff-modal-actions">
+                <button type="button" className="staff-table-btn default" onClick={closeStockDetailsModal}>
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -2547,7 +3390,7 @@ in
               <span className="link-left"><span className="link-icon">💉</span> Donor Dashboard</span>
               <span className="arrow">→</span>
             </Link>
-            <Link to="/">
+            <Link to="/" replace>
               <span className="link-left"><span className="link-icon">🏠</span> Back to Home</span>
               <span className="arrow">→</span>
             </Link>

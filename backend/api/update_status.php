@@ -24,6 +24,17 @@ require_once __DIR__ . '/../config/mailer.php';
 
 bts_require_auth(['admin', 'staff']);
 
+function appointment_table_exists(PDO $pdo, string $tableName): bool
+{
+    try {
+        $stmt = $pdo->prepare('SHOW TABLES LIKE ?');
+        $stmt->execute([$tableName]);
+        return (bool)$stmt->fetch(PDO::FETCH_NUM);
+    } catch (Throwable $exception) {
+        return false;
+    }
+}
+
 $data   = json_decode((string)file_get_contents('php://input'), true);
 if (!is_array($data)) {
     http_response_code(400);
@@ -60,8 +71,16 @@ try {
     // Table name is whitelisted above, safe to interpolate
     $stmt = $pdo->prepare("UPDATE `$table` SET status = ? WHERE id = ?");
     $stmt->execute([$status, $id]);
+    $affectedRows = $stmt->rowCount();
 
-    if ($stmt->rowCount() === 0) {
+    if (($table === 'tblappointments' || $table === 'appointments') && appointment_table_exists($pdo, 'tblappointments') && appointment_table_exists($pdo, 'appointments')) {
+        $mirrorTable = $table === 'tblappointments' ? 'appointments' : 'tblappointments';
+        $mirrorStmt = $pdo->prepare("UPDATE `$mirrorTable` SET status = ? WHERE id = ?");
+        $mirrorStmt->execute([$status, $id]);
+        $affectedRows += $mirrorStmt->rowCount();
+    }
+
+    if ($affectedRows === 0) {
         http_response_code(404);
         echo json_encode(['success' => false, 'message' => 'Record not found']);
         exit;

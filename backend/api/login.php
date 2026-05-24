@@ -29,7 +29,24 @@ if (!$email || !$userPassword) {
 }
 
 try {
-    $stmt = $pdo->prepare('SELECT id, name, email, password, role FROM tblusers WHERE email = ? LIMIT 1');
+    $hasColumn = static function (PDO $pdo, string $table, string $column): bool {
+        try {
+            $stmt = $pdo->prepare('SHOW COLUMNS FROM `' . str_replace('`', '``', $table) . '` LIKE ?');
+            $stmt->execute([$column]);
+            return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Throwable $exception) {
+            return false;
+        }
+    };
+
+    $selectColumns = ['id', 'name', 'email', 'password', 'role'];
+    foreach (['phone', 'profile_picture', 'assigned_blood_bank', 'position', 'employee_id', 'address', 'city', 'dzongkhag', 'date_of_birth', 'emergency_contact_name', 'emergency_contact_phone'] as $column) {
+        if ($hasColumn($pdo, 'tblusers', $column)) {
+            $selectColumns[] = $column;
+        }
+    }
+
+    $stmt = $pdo->prepare('SELECT ' . implode(', ', $selectColumns) . ' FROM tblusers WHERE email = ? LIMIT 1');
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -67,6 +84,17 @@ try {
         'email'   => $user['email'],
         'role'    => $user['role'],
         'donor_id' => $donorId,
+        'phone'   => $user['phone'] ?? null,
+        'profile_picture' => $user['profile_picture'] ?? null,
+        'assigned_blood_bank' => $user['assigned_blood_bank'] ?? null,
+        'position' => $user['position'] ?? null,
+        'employee_id' => $user['employee_id'] ?? null,
+        'address' => $user['address'] ?? null,
+        'city' => $user['city'] ?? null,
+        'dzongkhag' => $user['dzongkhag'] ?? null,
+        'date_of_birth' => $user['date_of_birth'] ?? null,
+        'emergency_contact_name' => $user['emergency_contact_name'] ?? null,
+        'emergency_contact_phone' => $user['emergency_contact_phone'] ?? null,
         'token'   => bts_create_token($tokenPayload),
         'expiresInSeconds' => 28800,
     ]);

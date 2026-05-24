@@ -363,6 +363,19 @@
 }
 .form-group input::placeholder { color: var(--light); font-weight: 400; }
 
+.form-group .field-error {
+  margin-top: 2px;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.form-spacer {
+  visibility: hidden;
+}
+
 /* ─── FORM ROW ──────────────────────────── */
 .form-row {
   display: grid;

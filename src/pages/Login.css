@@ -126,6 +126,25 @@
   animation: fadeUp 0.5s ease both;
 }
 
+.login-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #8b0012;
+  font-family: 'Arial', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.login-back-link:hover {
+  text-decoration: underline;
+}
+
 .login-form-header { margin-bottom: 32px; }
 .login-form-header h2 {
   font-size: 28px;

@@ -13,7 +13,6 @@ const HAS_GOOGLE_MAPS_KEY = Boolean(
 );
 const BLOOD_TYPES = ["", "A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
 const PAGE_SIZE = 8;
-const SHARED_BANKS_KEY = 'blood_banks_shared_v1';
 
 const FALLBACK_BANKS = [
   {
@@ -414,21 +413,6 @@ function getCandidateApiUrls() {
   return Array.from(urls);
 }
 
-function isCompleteSharedList(sharedList) {
-  if (!Array.isArray(sharedList) || sharedList.length === 0) return false;
-  if (sharedList.length < FALLBACK_BANKS.length) return false;
-
-  const expectedDzongkhags = new Set(FALLBACK_BANKS.map((bank) => bank.dzongkhag));
-  const actualDzongkhags = new Set(
-    sharedList
-      .map((bank) => String(bank.dzongkhag || "").trim())
-      .filter(Boolean)
-  );
-
-  return expectedDzongkhags.size === actualDzongkhags.size &&
-    Array.from(expectedDzongkhags).every((dzongkhag) => actualDzongkhags.has(dzongkhag));
-}
-
 function applyClientFilters(list, search, selectedDzongkhag, selectedType, openNow) {
   const normalizeType = (value) => String(value || "").trim().toUpperCase();
   const normalizedType = normalizeType(selectedType);
@@ -468,6 +452,7 @@ function applyClientFilters(list, search, selectedDzongkhag, selectedType, openN
 
 export default function BloodBanks() {
   const [banks, setBanks] = useState([]);
+  const [allBanks, setAllBanks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -485,44 +470,13 @@ export default function BloodBanks() {
   const infoWindowRef = useRef(null);
 
   const dzongkhags = useMemo(() => {
-    const all = banks.map((b) => b.dzongkhag).filter(Boolean);
+    const all = allBanks.map((b) => b.dzongkhag).filter(Boolean);
     return Array.from(new Set(all)).sort((a, b) => a.localeCompare(b));
-  }, [banks]);
+  }, [allBanks]);
 
   const fetchBanks = useCallback(async (signal) => {
-    // If a shared localStorage directory is present (from admin UI), prefer it so
-    // public and admin views stay in sync without requiring a backend.
-    try {
-      const raw = window.localStorage.getItem(SHARED_BANKS_KEY);
-      if (raw) {
-        const sharedList = JSON.parse(raw) || [];
-        if (isCompleteSharedList(sharedList)) {
-          const filtered = applyClientFilters(Array.isArray(sharedList) ? sharedList : [], search, selectedDzongkhag, selectedType, openNow)
-            .filter((b) => String(b.status || 'active').toLowerCase() === 'active');
-          setBanks(filtered);
-          setPage((prev) => {
-            const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-            return Math.min(prev, totalPages);
-          });
-          setLoading(false);
-          setError('Showing directory from local admin (shared) data.');
-          return;
-        } else {
-          // Shared data is incomplete; skip API and use full fallback list
-          const fallback = applyClientFilters(FALLBACK_BANKS, search, selectedDzongkhag, selectedType, openNow);
-          setBanks(fallback);
-          setPage((prev) => {
-            const totalPages = Math.max(1, Math.ceil(fallback.length / PAGE_SIZE));
-            return Math.min(prev, totalPages);
-          });
-          setLoading(false);
-          setError('');
-          return;
-        }
-      }
-    } catch (e) {
-      // ignore and fall back to API/fallback lists
-    }
+    // Skip localStorage check to always fetch fresh data from API with all banks
+    // This ensures all dzongkhags are displayed
     // Don't attempt fetch if signal is already aborted
     if (signal?.aborted) return;
 
@@ -532,6 +486,8 @@ export default function BloodBanks() {
     if (selectedDzongkhag) params.set("dzongkhag", selectedDzongkhag);
     if (selectedType) params.set("blood_type", selectedType);
     if (openNow) params.set("open_now", "1");
+    // Add cache-busting timestamp to force fresh data from server
+    params.set("_t", Date.now().toString());
 
     let lastError = null;
     for (const baseUrl of getCandidateApiUrls()) {
@@ -569,6 +525,7 @@ export default function BloodBanks() {
         }
 
         if (list.length === 0 && !search.trim() && !selectedDzongkhag && !selectedType && !openNow) {
+          setAllBanks(FALLBACK_BANKS);
           const backupAll = applyClientFilters(FALLBACK_BANKS, search, selectedDzongkhag, selectedType, openNow);
           setBanks(backupAll);
           setPage((prev) => {
@@ -579,6 +536,7 @@ export default function BloodBanks() {
           return;
         }
 
+        setAllBanks(list);
         setBanks(list);
         setPage((prev) => {
           const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
@@ -595,6 +553,7 @@ export default function BloodBanks() {
     // Only show error if not aborted
     if (signal?.aborted) return;
 
+    setAllBanks(FALLBACK_BANKS);
     const fallback = applyClientFilters(FALLBACK_BANKS, search, selectedDzongkhag, selectedType, openNow);
     setBanks(fallback);
     setPage(1);
@@ -619,32 +578,9 @@ export default function BloodBanks() {
       fetchBanks(controller.signal).catch(() => {});
     }, 30000);
 
-    // React to shared localStorage changes triggered by Admin UI (and custom dispatch)
-    const onSharedChange = () => {
-      try {
-        const raw = window.localStorage.getItem(SHARED_BANKS_KEY);
-        if (raw) {
-          const list = JSON.parse(raw) || [];
-          if (isCompleteSharedList(list)) {
-            const filtered = applyClientFilters(Array.isArray(list) ? list : [], search, selectedDzongkhag, selectedType, openNow)
-              .filter((b) => String(b.status || 'active').toLowerCase() === 'active');
-            setBanks(filtered);
-            setError('Showing directory from local admin (shared) data.');
-          } else {
-            const fallbackBanks = applyClientFilters(FALLBACK_BANKS, search, selectedDzongkhag, selectedType, openNow);
-            setBanks(fallbackBanks);
-            setError('');
-          }
-        }
-      } catch (e) {}
-    };
-    window.addEventListener('storage', onSharedChange);
-    window.addEventListener('banks-updated', onSharedChange);
     return () => {
       controller.abort();
       clearInterval(poll);
-      window.removeEventListener('storage', onSharedChange);
-      window.removeEventListener('banks-updated', onSharedChange);
     };
   }, [fetchBanks]);
 
@@ -864,6 +800,7 @@ export default function BloodBanks() {
                   <div className="bb-card-details">
                     <div className="bb-detail"><strong>Address:</strong> {b.address}</div>
                     <div className="bb-detail"><strong>Phone:</strong> {b.phone || "N/A"}</div>
+                    {b.email && <div className="bb-detail"><strong>Email:</strong> {b.email}</div>}
                     <div className="bb-detail"><strong>Hours:</strong> {formatHours(b.hours, b.hours_json)}</div>
                     <div className="bb-detail"><strong>Emergency:</strong> {b.emergency_phone || b.emergency || "N/A"}</div>
                   </div>

@@ -46,6 +46,17 @@ export default function Login() {
           name:  data.name,
           email: data.email,
           role:  data.role,
+          phone: data.phone || "",
+          profile_picture: data.profile_picture || "",
+          assigned_blood_bank: data.assigned_blood_bank || "",
+          position: data.position || "",
+          employee_id: data.employee_id || "",
+          address: data.address || "",
+          city: data.city || "",
+          dzongkhag: data.dzongkhag || "",
+          date_of_birth: data.date_of_birth || "",
+          emergency_contact_name: data.emergency_contact_name || "",
+          emergency_contact_phone: data.emergency_contact_phone || "",
           token: data.token,
         });
         if (data.role === "admin")  navigate("/admin");
@@ -66,8 +77,12 @@ export default function Login() {
     if (e.key === "Enter") handleLogin();
   };
 
-  const handleBackToHome = (e) => {
+  const handleBack = (e) => {
     e.preventDefault();
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
     navigate("/");
   };
 
@@ -153,6 +168,10 @@ export default function Login() {
       {/* Right Panel — Form */}
       <div className="login-right">
         <div className="login-form-box">
+          <button type="button" className="login-back-link" onClick={handleBack}>
+            ← Back
+          </button>
+
           <div className="login-form-header">
             <h2>Welcome back</h2>
             <p>Sign in to your account to continue</p>
@@ -299,7 +318,7 @@ export default function Login() {
           </p>
 
           <p className="login-home-link">
-            <Link to="/" onClick={handleBackToHome}>← Back to Home</Link>
+            <Link to="/" onClick={handleBack}>← Back to Home</Link>
           </p>
         </div>
       </div>

@@ -155,6 +155,7 @@ try {
     $workflowStatusSelect = $columnExists($mysqli, 'tbldonors', 'workflow_status') ? 'd.workflow_status' : 'NULL AS workflow_status';
     $latestTestResultSelect = $columnExists($mysqli, 'tbldonors', 'latest_test_result') ? 'd.latest_test_result' : 'NULL AS latest_test_result';
     $sampleTestedSelect = $columnExists($mysqli, 'tbldonors', 'sample_tested') ? 'd.sample_tested' : 'NULL AS sample_tested';
+    $sampleNotesSelect = $columnExists($mysqli, 'tbldonor_samples', 'notes') ? 's.notes' : 'NULL AS notes';
 
     $sqlAllDonors = "
         SELECT 
@@ -181,6 +182,7 @@ try {
             s.hcv_result,
             s.syphilis_result,
             s.malaria_result,
+            {$sampleNotesSelect},
             d.created_at AS register_date
         FROM tbldonors d
         LEFT JOIN tbldonor_samples s ON s.id = (
@@ -216,6 +218,7 @@ try {
             'hcv_result' => $row['hcv_result'] ?? null,
             'syphilis_result' => $row['syphilis_result'] ?? null,
             'malaria_result' => $row['malaria_result'] ?? null,
+            'notes' => $row['notes'] ?? null,
             'health_declaration' => $row['health_declaration'] ?? null,
             'health_declaration_summary' => $formatHealthSummary($row),
             'positive_diseases' => implode(', ', array_values(array_filter([
@@ -225,6 +228,7 @@ try {
                 strtolower(trim((string)($row['syphilis_result'] ?? ''))) === 'reactive' ? 'Syphilis' : null,
                 strtolower(trim((string)($row['malaria_result'] ?? ''))) === 'reactive' ? 'Malaria' : null,
             ]))),
+            'staff_deferral_summary' => preg_match('/Staff decision:\s*(.*)$/mi', (string)($row['notes'] ?? ''), $matches) ? trim((string)$matches[1]) : null,
             'latest_test_result_display' => function_exists('str_contains') && !empty($row['latest_test_result']) && stripos((string)$row['latest_test_result'], 'positive') !== false && !empty($row['sample_id']) ? (
                 !empty(array_filter([
                     strtolower(trim((string)($row['hiv_result'] ?? ''))) === 'reactive' ? 'HIV' : null,

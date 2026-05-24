@@ -2,11 +2,12 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./DonorRegister.css";
 import { saveAuthSession } from "../utils/auth";
+import { titleCase } from "../utils/strings";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
 const DEFAULT_API_URLS = [
-  "http://localhost/blood_donation/api/register_donor.php",
+  "http://localhost/blood_donation/backend/api/register_donor.php",
 ];
 
 const getCandidateApiUrls = () => {
@@ -36,6 +37,8 @@ const getFriendlyServerErrorFromRawBody = (rawBody) => {
   const normalized = rawBody.replace(/\s+/g, " ").trim();
   if (/Duplicate entry .* for key 'email'/i.test(normalized))
     return "This email is already registered.";
+  if (/Duplicate entry .* for key 'cid_number'/i.test(normalized))
+    return "This CID is already registered.";
   return null;
 };
 
@@ -46,12 +49,14 @@ export default function DonorRegister() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [popup, setPopup] = useState({ open: false, title: "", message: "", kind: "error" });
+  const [formErrors, setFormErrors] = useState({});
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     password: "",
     confirmPassword: "",
     phone: "",
+    cidNumber: "",
     dateOfBirth: "",
     gender: "",
     bloodType: "",
@@ -82,7 +87,7 @@ export default function DonorRegister() {
 
   const resetForm = () =>
     setFormData({
-      fullName: "", email: "", password: "", confirmPassword: "", phone: "",
+      fullName: "", email: "", password: "", confirmPassword: "", phone: "", cidNumber: "",
       dateOfBirth: "", gender: "", bloodType: "", address: "", city: "",
       dzongkhag: "", weight: "", lastDonationDate: "",
       healthDeclaration: {
@@ -97,6 +102,15 @@ export default function DonorRegister() {
       emergencyContactPhone: "",
     });
 
+  const autoCapitalizeName = (value) => {
+    if (!value) return value;
+    // Split by space, capitalize first letter of each word
+    return value
+      .split(' ')
+      .map(word => word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word)
+      .join(' ');
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (type === "checkbox" && name.startsWith("healthDeclaration.")) {
@@ -110,25 +124,51 @@ export default function DonorRegister() {
     }
     if (name === "phone") {
       setFormData({ ...formData, phone: value.replace(/\D/g, "").slice(0, 8) });
+      setFormErrors((prev) => ({ ...prev, phone: "" }));
+      return;
+    }
+    if (name === "cidNumber") {
+      setFormData({ ...formData, cidNumber: value.replace(/\D/g, "").slice(0, 11) });
+      setFormErrors((prev) => ({ ...prev, cidNumber: "" }));
       return;
     }
     if (name === "emergencyContactPhone") {
       setFormData({ ...formData, emergencyContactPhone: value.replace(/\D/g, "").slice(0, 8) });
+      setFormErrors((prev) => ({ ...prev, emergencyContactPhone: "" }));
+      return;
+    }
+    if (name === "fullName" || name === "emergencyContactName") {
+      setFormData({ ...formData, [name]: autoCapitalizeName(value) });
       return;
     }
     setFormData({ ...formData, [name]: value });
+    setFormErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const validateForm = () => {
+    const nextErrors = {};
+    if (!formData.fullName || !formData.email || !formData.password || !formData.confirmPassword ||
+      !formData.phone || !formData.cidNumber || !formData.dateOfBirth || !formData.gender || !formData.bloodType ||
+      !formData.address || !formData.city || !formData.dzongkhag || !formData.weight ||
+      !formData.emergencyContactName || !formData.emergencyContactPhone) {
+      nextErrors.general = "Please fill all required fields.";
+    }
+    if (formData.cidNumber && !/^[0-9]{11}$/.test(formData.cidNumber)) {
+      nextErrors.cidNumber = "CID must be 11 digits";
+    }
+    return nextErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.fullName || !formData.email || !formData.password || !formData.confirmPassword ||
-      !formData.phone || !formData.dateOfBirth || !formData.gender || !formData.bloodType ||
-      !formData.address || !formData.city || !formData.dzongkhag || !formData.weight ||
-      !formData.emergencyContactName || !formData.emergencyContactPhone) {
-      showPopup("Please Check", "Please fill all required fields.");
+    const nextErrors = validateForm();
+    setFormErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      showPopup("Please Check", nextErrors.cidNumber || nextErrors.general || "Please review the highlighted fields.");
       return;
     }
+
     if (formData.password.length < 6) {
       showPopup("Weak Password", "Password must be at least 6 characters.");
       return;
@@ -174,12 +214,15 @@ export default function DonorRegister() {
       const candidateUrls = getCandidateApiUrls();
       let lastError = null, completed = false, savedByUrl = "", savedId = null, result = null;
 
+      // Normalize name capitalization before sending
+      const normalizedPayload = { ...formData, fullName: titleCase(formData.fullName || '') };
+
       for (const apiUrl of candidateUrls) {
         try {
           const response = await fetch(apiUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...formData, weight: Number(formData.weight) }),
+            body: JSON.stringify({ ...normalizedPayload, weight: Number(formData.weight) }),
           });
           const rawBody = await response.text();
           try {
@@ -201,6 +244,9 @@ export default function DonorRegister() {
         } catch (requestError) {
           lastError = requestError;
           const shouldTryNextEndpoint = requestError?.name === "TypeError" || requestError?.name === "ParseError";
+            if (String(requestError?.message || "").includes("CID is already registered")) {
+              setFormErrors((prev) => ({ ...prev, cidNumber: "This CID is already registered" }));
+            }
           if (!shouldTryNextEndpoint) throw requestError;
         }
       }
@@ -243,6 +289,9 @@ export default function DonorRegister() {
         <div className="register-container">
 
           <form className="register-form" onSubmit={handleSubmit} noValidate>
+            {/* Prevent aggressive browser autofill by placing hidden dummy fields */}
+            <input type="text" name="fakeusernameremembered" autoComplete="username" style={{ display: 'none' }} />
+            <input type="password" name="fakepasswordremembered" autoComplete="new-password" style={{ display: 'none' }} />
 
             {/* SECTION 1 – Personal Information */}
             <div className="form-section">
@@ -261,7 +310,7 @@ export default function DonorRegister() {
                 <div className="form-group">
                   <label>Email *</label>
                   <input type="email" name="email" value={formData.email}
-                    onChange={handleChange} placeholder="your.email@example.com" required />
+                    onChange={handleChange} placeholder="your.email@example.com" required autoComplete="email" />
                 </div>
                 <div className="form-group">
                   <label>Phone Number *</label>
@@ -269,6 +318,27 @@ export default function DonorRegister() {
                     onChange={handleChange} placeholder="16XXXXXX / 17XXXXXX / 77XXXXXX"
                     inputMode="numeric" maxLength={8} required />
                 </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>CID Number *</label>
+                  <input
+                    type="text"
+                    name="cidNumber"
+                    value={formData.cidNumber}
+                    onChange={handleChange}
+                    placeholder="Enter 11-digit CID number"
+                    inputMode="numeric"
+                    maxLength={11}
+                    pattern="[0-9]*"
+                    required
+                    aria-invalid={Boolean(formErrors.cidNumber)}
+                    autoComplete="off"
+                  />
+                  {formErrors.cidNumber && <div className="field-error">{formErrors.cidNumber}</div>}
+                </div>
+                <div className="form-group form-spacer" aria-hidden="true" />
               </div>
 
               <div className="form-row">

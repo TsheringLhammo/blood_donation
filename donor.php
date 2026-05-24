@@ -1,6 +1,110 @@
 <?php
 require_once __DIR__ . '/backend/config/db.php';
 
+function esc(?string $value): string
+{
+  return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+}
+
+function tableExists(PDO $pdo, string $table): bool
+{
+  try {
+    $stmt = $pdo->prepare('SHOW TABLES LIKE ?');
+    $stmt->execute([$table]);
+    return (bool)$stmt->fetchColumn();
+  } catch (Throwable $exception) {
+    return false;
+  }
+}
+
+function columnExists(PDO $pdo, string $table, string $column): bool
+{
+  try {
+    $stmt = $pdo->prepare('SHOW COLUMNS FROM `' . str_replace('`', '``', $table) . '` LIKE ?');
+    $stmt->execute([$column]);
+    return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+  } catch (Throwable $exception) {
+    return false;
+  }
+}
+
+function loadDonationSummary(PDO $pdo, int $donorId, string $donorName, ?int $userId): array
+{
+  $donations = [];
+
+  if (tableExists($pdo, 'donation_history')) {
+    $dateColumn = columnExists($pdo, 'donation_history', 'donation_date') ? 'donation_date' : (columnExists($pdo, 'donation_history', 'created_at') ? 'created_at' : 'id');
+    if (columnExists($pdo, 'donation_history', 'donor_id')) {
+      $stmt = $pdo->prepare('SELECT id, ' . $dateColumn . ' AS donation_date FROM donation_history WHERE donor_id = ? ORDER BY ' . $dateColumn . ' DESC, id DESC');
+      $stmt->execute([$donorId]);
+      $donations = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } elseif (columnExists($pdo, 'donation_history', 'donor_name')) {
+      $stmt = $pdo->prepare('SELECT id, ' . $dateColumn . ' AS donation_date FROM donation_history WHERE donor_name = ? ORDER BY ' . $dateColumn . ' DESC, id DESC');
+      $stmt->execute([$donorName]);
+      $donations = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+  } elseif (tableExists($pdo, 'tbldonations')) {
+    $dateColumn = columnExists($pdo, 'tbldonations', 'donation_date') ? 'donation_date' : (columnExists($pdo, 'tbldonations', 'created_at') ? 'created_at' : 'id');
+    $statusFilter = columnExists($pdo, 'tbldonations', 'status') ? " AND LOWER(COALESCE(status, '')) IN ('safe', 'stocked')" : '';
+    if (columnExists($pdo, 'tbldonations', 'donor_id')) {
+      $stmt = $pdo->prepare('SELECT id, ' . $dateColumn . ' AS donation_date FROM tbldonations WHERE donor_id = ?' . $statusFilter . ' ORDER BY ' . $dateColumn . ' DESC, id DESC');
+      $stmt->execute([$donorId]);
+      $donations = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } elseif (columnExists($pdo, 'tbldonations', 'donor_name')) {
+      $stmt = $pdo->prepare('SELECT id, ' . $dateColumn . ' AS donation_date FROM tbldonations WHERE donor_name = ?' . $statusFilter . ' ORDER BY ' . $dateColumn . ' DESC, id DESC');
+      $stmt->execute([$donorName]);
+      $donations = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+  }
+
+  $lastDonation = $donations[0]['donation_date'] ?? null;
+  $lastDonationDisplay = 'Never';
+  $nextEligibleDisplay = 'N/A';
+
+  if ($lastDonation) {
+    $parsed = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string)$lastDonation)
+      ?: DateTimeImmutable::createFromFormat('Y-m-d', substr((string)$lastDonation, 0, 10));
+    if ($parsed) {
+      $lastDonationDisplay = $parsed->format('d M Y');
+      $nextEligibleDisplay = $parsed->modify('+90 days')->format('d M Y');
+    }
+  }
+
+  $appointmentCount = 0;
+  if (tableExists($pdo, 'appointments')) {
+    if ($userId !== null && columnExists($pdo, 'appointments', 'user_id')) {
+      $stmt = $pdo->prepare('SELECT COUNT(*) FROM appointments WHERE user_id = ?');
+      $stmt->execute([$userId]);
+      $appointmentCount = (int)$stmt->fetchColumn();
+    } elseif (columnExists($pdo, 'appointments', 'full_name')) {
+      $stmt = $pdo->prepare('SELECT COUNT(*) FROM appointments WHERE full_name = ?');
+      $stmt->execute([$donorName]);
+      $appointmentCount = (int)$stmt->fetchColumn();
+    }
+  } elseif (tableExists($pdo, 'tblappointments')) {
+    if ($userId !== null && columnExists($pdo, 'tblappointments', 'user_id')) {
+      $stmt = $pdo->prepare('SELECT COUNT(*) FROM tblappointments WHERE user_id = ?');
+      $stmt->execute([$userId]);
+      $appointmentCount = (int)$stmt->fetchColumn();
+    } elseif (columnExists($pdo, 'tblappointments', 'donor_id')) {
+      $stmt = $pdo->prepare('SELECT COUNT(*) FROM tblappointments WHERE donor_id = ?');
+      $stmt->execute([$donorId]);
+      $appointmentCount = (int)$stmt->fetchColumn();
+    } elseif (columnExists($pdo, 'tblappointments', 'full_name')) {
+      $stmt = $pdo->prepare('SELECT COUNT(*) FROM tblappointments WHERE full_name = ?');
+      $stmt->execute([$donorName]);
+      $appointmentCount = (int)$stmt->fetchColumn();
+    }
+  }
+
+  return [
+    'total_donations' => count($donations),
+    'total_appointments' => $appointmentCount,
+    'last_donation' => $lastDonationDisplay,
+    'next_eligible' => $nextEligibleDisplay,
+  ];
+}
+
 $email = isset($_GET['donor']) ? trim((string)$_GET['donor']) : 'yoyo@example.com';
 
 $stmt = $pdo->prepare('SELECT * FROM tbldonors WHERE email = ? LIMIT 1');
@@ -15,6 +119,16 @@ if (!$donor) {
     echo 'No donor records found. Import database.sql first.';
     exit;
 }
+
+$linkedUserId = null;
+$userStmt = $pdo->prepare('SELECT id FROM tblusers WHERE email = ? LIMIT 1');
+$userStmt->execute([(string)$donor['email']]);
+$userRow = $userStmt->fetch(PDO::FETCH_ASSOC);
+if ($userRow) {
+  $linkedUserId = (int)$userRow['id'];
+}
+
+$donationSummary = loadDonationSummary($pdo, (int)$donor['id'], (string)$donor['full_name'], $linkedUserId);
 
 $notificationStmt = $pdo->prepare('SELECT n.id, n.decision, n.message, n.created_at, d.full_name AS donor_name FROM tblnotifications n INNER JOIN tbldonors d ON d.id = n.donor_id WHERE n.donor_id = ? AND n.is_read = 0 ORDER BY n.created_at DESC');
 $notificationStmt->execute([(int)$donor['id']]);
@@ -100,7 +214,14 @@ function notificationTitle(string $decision): string
     .message-box { background:#fff8f1; border:1px solid #f3d4b5; border-radius:14px; padding:14px 16px; margin-top:12px; }
     .contact-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
     .badge-line { margin-top:12px; }
+    .activity-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px; margin-top:14px; }
+    .activity-card { border:1px solid var(--line); border-radius:14px; padding:14px; background:linear-gradient(180deg, #fff, #fff8f1); }
+    .activity-card .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+    .activity-card .value { margin-top:8px; font-size:24px; font-weight:800; color:var(--accent); }
+    .activity-card .value.small { font-size:18px; }
     @media (max-width: 720px) { .hero { flex-direction:column; } .contact-grid { grid-template-columns:1fr; } }
+    @media (max-width: 900px) { .activity-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .activity-grid { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -128,6 +249,25 @@ function notificationTitle(string $decision): string
       <div class="panel-body">
         <div class="status"><?= esc($statusMessage) ?></div>
         <div class="small">Email: <?= esc($donor['email']) ?> | Phone: <?= esc($donor['phone']) ?> | Blood Type: <?= esc($donor['blood_type']) ?></div>
+
+        <div class="activity-grid">
+          <div class="activity-card">
+            <div class="label">Total Donations</div>
+            <div class="value"><?= esc((string)$donationSummary['total_donations']) ?></div>
+          </div>
+          <div class="activity-card">
+            <div class="label">Total Appointments</div>
+            <div class="value"><?= esc((string)$donationSummary['total_appointments']) ?></div>
+          </div>
+          <div class="activity-card">
+            <div class="label">Last Donation</div>
+            <div class="value small"><?= esc((string)$donationSummary['last_donation']) ?></div>
+          </div>
+          <div class="activity-card">
+            <div class="label">Next Eligible</div>
+            <div class="value small"><?= esc((string)$donationSummary['next_eligible']) ?></div>
+          </div>
+        </div>
 
         <?php if ($latestNotification): ?>
           <div class="message-box">

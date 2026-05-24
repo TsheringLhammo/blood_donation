@@ -208,6 +208,28 @@ function fallback_banks_data(): array
             'total_available_units' => 12,
             'is_open_now' => true,
         ],
+        [
+            'id' => 9,
+            'name' => 'Bumthang Blood Bank',
+            'hospital' => 'Bumthang District Hospital',
+            'dzongkhag' => 'Bumthang',
+            'address' => 'Jakar, Bumthang',
+            'phone' => '03-631116',
+            'email' => null,
+            'hours' => 'Mon-Fri: 9:00 AM - 3:30 PM',
+            'hours_json' => [],
+            'emergency' => 'Emergency on call',
+            'emergency_phone' => '03-631116',
+            'latitude' => null,
+            'longitude' => null,
+            'services' => ['Blood Donation', 'Screening'],
+            'status' => 'active',
+            'availability_status' => 'limited',
+            'types' => ['O+', 'A+'],
+            'inventory' => ['O+' => 0, 'A+' => 0],
+            'total_available_units' => 0,
+            'is_open_now' => false,
+        ],
     ];
 }
 
@@ -304,6 +326,15 @@ try {
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $inventoryByBank = [];
+    $hasInventoryTable = false;
+    try {
+        $tableStmt = $pdo->query("SHOW TABLES LIKE 'tblinventory'");
+        $hasInventoryTable = (bool)$tableStmt->fetch(PDO::FETCH_NUM);
+    } catch (Throwable $ignored) {
+        $hasInventoryTable = false;
+    }
+
     $hasUnitsTable = false;
     try {
         $tableStmt = $pdo->query("SHOW TABLES LIKE 'tblblood_units'");
@@ -312,13 +343,11 @@ try {
         $hasUnitsTable = false;
     }
 
-    $inventoryByBank = [];
-    if ($hasUnitsTable) {
+    if ($hasInventoryTable) {
         $inventoryStmt = $pdo->query(
-            "SELECT blood_bank_id, blood_type, COUNT(*) AS unit_count
-             FROM tblblood_units
-             WHERE status = 'Available' AND expiry_date >= CURDATE()
-             GROUP BY blood_bank_id, blood_type"
+            'SELECT blood_bank_id, blood_type,
+                    (COALESCE(whole_units,0) + COALESCE(prbc_units,0) + COALESCE(platelets_units,0) + COALESCE(ffp_units,0)) AS unit_count
+             FROM tblinventory'
         );
         foreach ($inventoryStmt->fetchAll(PDO::FETCH_ASSOC) as $invRow) {
             $bankId = (int)$invRow['blood_bank_id'];
@@ -329,11 +358,14 @@ try {
             }
             $inventoryByBank[$bankId][$bt] = $count;
         }
-    } else {
+    }
+
+    if (!$inventoryByBank && $hasUnitsTable) {
         $inventoryStmt = $pdo->query(
-            'SELECT blood_bank_id, blood_type,
-                    (COALESCE(whole_units,0) + COALESCE(prbc_units,0) + COALESCE(platelets_units,0) + COALESCE(ffp_units,0)) AS unit_count
-             FROM tblinventory'
+            "SELECT blood_bank_id, blood_type, COUNT(*) AS unit_count
+             FROM tblblood_units
+             WHERE status = 'Available' AND expiry_date >= CURDATE()
+             GROUP BY blood_bank_id, blood_type"
         );
         foreach ($inventoryStmt->fetchAll(PDO::FETCH_ASSOC) as $invRow) {
             $bankId = (int)$invRow['blood_bank_id'];

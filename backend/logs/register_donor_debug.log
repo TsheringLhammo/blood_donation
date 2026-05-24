@@ -1,0 +1,109 @@
+---- REGISTER DEBUG 2026-05-14T20:08:38+02:00 ----
+REMOTE_ADDR=::1
+RAW_INPUT={
+    "address":  "Addr",
+    "dzongkhag":  "Thimphu",
+    "fullName":  "Gita Rai",
+    "emergencyContactPhone":  "17654322",
+    "bloodType":  "A+",
+    "dateOfBirth":  "1990-01-01",
+    "password":  "secret123",
+    "emergencyContactName":  "Contact",
+    "phone":  "17654321",
+    "healthDeclaration":  {
+                              "not_taking_antibiotics_or_blood_thinners":  true,
+                              "no_surgery_last_6_months":  true,
+                              "no_tattoo_piercing_acupuncture_last_6_months":  true,
+                              "no_cold_flu_or_fever_today":  true
+                          },
+    "consent_medical":  true,
+    "city":  "Thimphu",
+    "weight":  55,
+    "gender":  "Female",
+    "email":  "kileyye12@gmail.com"
+}
+PAYLOAD_KEYS=address,dzongkhag,fullName,emergencyContactPhone,bloodType,dateOfBirth,password,emergencyContactName,phone,healthDeclaration,consent_medical,city,weight,gender,email
+---- REGISTER DEBUG 2026-05-14T20:14:12+02:00 ----
+REMOTE_ADDR=::1
+RAW_INPUT={
+    "address":  "Addr",
+    "dzongkhag":  "Thimphu",
+    "fullName":  "Save Test",
+    "emergencyContactPhone":  "17612346",
+    "bloodType":  "A+",
+    "dateOfBirth":  "1995-06-01",
+    "password":  "secret123",
+    "emergencyContactName":  "Contact",
+    "phone":  "17612345",
+    "healthDeclaration":  {
+                              "not_taking_antibiotics_or_blood_thinners":  true,
+                              "no_surgery_last_6_months":  true,
+                              "no_tattoo_piercing_acupuncture_last_6_months":  true,
+                              "no_cold_flu_or_fever_today":  true
+                          },
+    "consent_medical":  true,
+    "city":  "Thimphu",
+    "weight":  50,
+    "gender":  "Female",
+    "email":  "save_test_20260515@example.com"
+}
+PAYLOAD_KEYS=address,dzongkhag,fullName,emergencyContactPhone,bloodType,dateOfBirth,password,emergencyContactName,phone,healthDeclaration,consent_medical,city,weight,gender,email
+ERROR: 2026-05-14T20:14:12+02:00 code=HY093 message=SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens
+---- REGISTER DEBUG 2026-05-14T20:14:46+02:00 ----
+REMOTE_ADDR=::1
+RAW_INPUT={
+    "address":  "Addr",
+    "dzongkhag":  "Thimphu",
+    "fullName":  "Save Test 2",
+    "emergencyContactPhone":  "17622346",
+    "bloodType":  "A+",
+    "dateOfBirth":  "1995-06-01",
+    "password":  "secret123",
+    "emergencyContactName":  "Contact",
+    "phone":  "17622345",
+    "healthDeclaration":  {
+                              "not_taking_antibiotics_or_blood_thinners":  true,
+                              "no_surgery_last_6_months":  true,
+                              "no_tattoo_piercing_acupuncture_last_6_months":  true,
+                              "no_cold_flu_or_fever_today":  true
+                          },
+    "consent_medical":  true,
+    "city":  "Thimphu",
+    "weight":  50,
+    "gender":  "Female",
+    "email":  "save_test2_20260515@example.com"
+}
+PAYLOAD_KEYS=address,dzongkhag,fullName,emergencyContactPhone,bloodType,dateOfBirth,password,emergencyContactName,phone,healthDeclaration,consent_medical,city,weight,gender,email
+FINAL_COLUMNS: full_name, email, phone, date_of_birth, blood_type, address, city, dzongkhag, gender, weight, last_donation_date, health_tattoo, health_antibiotics, health_surgery, emergency_contact_name, emergency_contact_phone, health_no_cold_flush, consent, health_no_cold_flu, consent_medical, health_declaration, deferred, deferral_reason, status
+FINAL_PLACEHOLDERS: :full_name, :email, :phone, :date_of_birth, :blood_type, :address, :city, :dzongkhag, :gender, :weight, :last_donation_date, :health_tattoo, :health_antibiotics, :health_surgery, :emergency_contact_name, :emergency_contact_phone, :health_no_cold, :consent_col, :health_no_cold_flu, :consent_medical, :health_declaration, :deferred, :deferral_reason, :status
+FINAL_PARAMS_KEYS: :full_name, :email, :phone, :date_of_birth, :blood_type, :address, :city, :dzongkhag, :gender, :weight, :health_tattoo, :health_antibiotics, :health_surgery, :emergency_contact_name, :emergency_contact_phone, :health_no_cold, :consent_col, :health_no_cold_flu, :consent_medical, :health_declaration, :deferred, :status
+ERROR: 2026-05-14T20:14:47+02:00 code=HY093 message=SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens
+---- REGISTER DEBUG 2026-05-14T20:15:14+02:00 ----
+REMOTE_ADDR=::1
+RAW_INPUT={
+    "address":  "Addr",
+    "dzongkhag":  "Thimphu",
+    "fullName":  "Save Test 3",
+    "emergencyContactPhone":  "17632346",
+    "bloodType":  "A+",
+    "dateOfBirth":  "1995-06-01",
+    "password":  "secret123",
+    "emergencyContactName":  "Contact",
+    "phone":  "17632345",
+    "healthDeclaration":  {
+                              "not_taking_antibiotics_or_blood_thinners":  true,
+                              "no_surgery_last_6_months":  true,
+                              "no_tattoo_piercing_acupuncture_last_6_months":  true,
+                              "no_cold_flu_or_fever_today":  true
+                          },
+    "consent_medical":  true,
+    "city":  "Thimphu",
+    "weight":  50,
+    "gender":  "Female",
+    "email":  "save_test3_20260515@example.com"
+}
+PAYLOAD_KEYS=address,dzongkhag,fullName,emergencyContactPhone,bloodType,dateOfBirth,password,emergencyContactName,phone,healthDeclaration,consent_medical,city,weight,gender,email
+FINAL_COLUMNS: full_name, email, phone, date_of_birth, blood_type, address, city, dzongkhag, gender, weight, last_donation_date, health_tattoo, health_antibiotics, health_surgery, emergency_contact_name, emergency_contact_phone, health_no_cold_flush, consent, health_no_cold_flu, consent_medical, health_declaration, deferred, deferral_reason, status
+FINAL_PLACEHOLDERS: :full_name, :email, :phone, :date_of_birth, :blood_type, :address, :city, :dzongkhag, :gender, :weight, :last_donation_date, :health_tattoo, :health_antibiotics, :health_surgery, :emergency_contact_name, :emergency_contact_phone, :health_no_cold, :consent_col, :health_no_cold_flu, :consent_medical, :health_declaration, :deferred, :deferral_reason, :status
+FINAL_PARAMS_KEYS: :full_name, :email, :phone, :date_of_birth, :blood_type, :address, :city, :dzongkhag, :gender, :weight, :last_donation_date, :health_tattoo, :health_antibiotics, :health_surgery, :emergency_contact_name, :emergency_contact_phone, :health_no_cold, :consent_col, :health_no_cold_flu, :consent_medical, :health_declaration, :deferred, :deferral_reason, :status
+SUCCESS: donor inserted. userId=25 time=2026-05-14T20:15:15+02:00

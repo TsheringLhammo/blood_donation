@@ -155,11 +155,19 @@
 }
 
 .notification-loading,
-.notification-empty {
+.notification-empty,
+.notification-error {
   padding: 40px 16px;
   text-align: center;
   color: #999;
   font-size: 0.95rem;
+}
+
+.notification-error {
+  color: #c8102e;
+  background: #fff1f3;
+  border: 1px solid #f5c0c9;
+  border-radius: 8px;
 }
 
 .notification-footer {

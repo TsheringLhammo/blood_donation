@@ -212,6 +212,37 @@ try {
     ]);
 
     http_response_code(201);
+    // Best-effort: send confirmation email and create in-app notification for admins
+    try {
+        require_once __DIR__ . '/../config/mailer.php';
+        require_once __DIR__ . '/workflow_helpers.php';
+
+        $campId = (int)$pdo->lastInsertId();
+        $subject = 'Camp request received';
+        $textBody = "Dear {$contactPerson},\n\nWe have received your camp request (ID: {$campId}). We will review and contact you with next steps.\n\nRegards,\nBlood Transfusion Services";
+        $htmlBody = "<p>Dear {$contactPerson},</p><p>We have received your camp request (ID: <strong>{$campId}</strong>). We will review and contact you with next steps.</p><p>Regards,<br/>Blood Transfusion Services</p>";
+
+        $meta = [];
+        if ($email !== '') {
+            @bts_send_email($email, $subject, $htmlBody, $textBody, $meta);
+        }
+
+        try {
+            $notif = [
+                'role_target' => 'admin',
+                'title' => 'New camp request',
+                'message' => "Camp request #{$campId} from {$organizationName} ({$contactPerson})",
+                'severity' => 'info',
+                'channel' => 'in_app',
+                'is_read' => 0,
+                'created_at' => date('Y-m-d H:i:s'),
+            ];
+            workflow_insert_notification($pdo, $notif);
+        } catch (Throwable $_) {}
+    } catch (Throwable $_) {
+        // ignore notification/email errors
+    }
+
     echo json_encode([
         'success' => true,
         'message' => 'Camp request submitted successfully.',

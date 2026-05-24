@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { authFetch } from "../utils/auth";
 import "./NotificationDropdown.css";
 
@@ -7,6 +7,48 @@ const NotificationDropdown = () => {
   const [notifications, setNotifications] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      setError("");
+      const response = await authFetch("donor_notifications_count.php", {
+        cache: "no-store",
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUnreadCount(Number(data.unread_count || 0));
+      } else {
+        setError(data.message || "Unable to load notification count.");
+      }
+    } catch (requestError) {
+      console.error("Error fetching unread count:", requestError);
+      setError("Unable to load notification count.");
+    }
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await authFetch("donor_notifications_list.php", {
+        cache: "no-store",
+      });
+      const data = await response.json();
+      if (data.success) {
+        setNotifications(Array.isArray(data.data) ? data.data : []);
+      } else {
+        setError(data.message || "Unable to load notifications.");
+        setNotifications([]);
+      }
+    } catch (requestError) {
+      console.error("Error fetching notifications:", requestError);
+      setError("Unable to load notifications.");
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const formatDateTime = (value) => {
     if (!value) return "";
@@ -23,46 +65,44 @@ const NotificationDropdown = () => {
 
   // Fetch unread count on mount and periodically
   useEffect(() => {
-    const fetchUnreadCount = async () => {
-      try {
-        const response = await authFetch("donor_notifications_count.php", {
-          cache: "no-store",
-        });
-        const data = await response.json();
-        if (data.success) {
-          setUnreadCount(data.unread_count);
-        }
-      } catch (error) {
-        console.error("Error fetching unread count:", error);
-      }
-    };
-
     fetchUnreadCount();
 
     // Poll every 30 seconds for new notifications
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchUnreadCount]);
+
+  useEffect(() => {
+    if (!showDropdown) return undefined;
+
+    fetchNotifications();
+
+    const interval = setInterval(() => {
+      fetchNotifications();
+      fetchUnreadCount();
+    }, 15000);
+
+    const onFocus = () => {
+      fetchNotifications();
+      fetchUnreadCount();
+    };
+
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [showDropdown, fetchNotifications, fetchUnreadCount]);
 
   // Fetch all notifications when dropdown is opened
   const handleBellClick = async () => {
-    setShowDropdown(!showDropdown);
+    const willOpen = !showDropdown;
+    setShowDropdown(willOpen);
 
-    if (!showDropdown) {
-      setLoading(true);
-      try {
-        const response = await authFetch("donor_notifications_list.php", {
-          cache: "no-store",
-        });
-        const data = await response.json();
-        if (data.success) {
-          setNotifications(data.data || []);
-        }
-      } catch (error) {
-        console.error("Error fetching notifications:", error);
-      } finally {
-        setLoading(false);
-      }
+    if (willOpen) {
+      fetchNotifications();
+      fetchUnreadCount();
     }
   };
 
@@ -85,13 +125,7 @@ const NotificationDropdown = () => {
           )
         );
         // Refresh unread count
-        const countResponse = await authFetch("donor_notifications_count.php", {
-          cache: "no-store",
-        });
-        const countData = await countResponse.json();
-        if (countData.success) {
-          setUnreadCount(countData.unread_count);
-        }
+        await fetchUnreadCount();
       }
     } catch (error) {
       console.error("Error marking notification as read:", error);
@@ -131,6 +165,8 @@ const NotificationDropdown = () => {
 
           {loading ? (
             <div className="notification-loading">Loading...</div>
+          ) : error ? (
+            <div className="notification-error">{error}</div>
           ) : notifications.length === 0 ? (
             <div className="notification-empty">No notifications yet</div>
           ) : (

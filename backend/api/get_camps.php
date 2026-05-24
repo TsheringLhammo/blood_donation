@@ -26,6 +26,7 @@ try {
             dzongkhag, camp_type, venue_address, preferred_date, alternate_date,
             expected_donors, facilities_available, additional_info, status, created_at
          FROM tblblood_camps
+         WHERE status != 'deleted'
          ORDER BY preferred_date ASC, id DESC"
     );
     $rows = $stmt->fetchAll();

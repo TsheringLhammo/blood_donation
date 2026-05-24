@@ -27,16 +27,16 @@ try {
     $stmt = $pdo->prepare("
         SELECT 
             id,
-            organization,
-            date,
+            organization_name,
+            preferred_date,
             status,
             contact_person,
-            phone,
+            phone_number,
             email,
-            expected_participants
-        FROM camp_requests 
+            expected_donors
+        FROM tblblood_camps 
         WHERE status != 'deleted'
-        ORDER BY date DESC
+        ORDER BY preferred_date DESC
         LIMIT 20
     ");
     $stmt->execute();
@@ -44,7 +44,12 @@ try {
     
     // Format the data
     foreach ($camps as &$camp) {
-        $camp['date'] = date('Y-m-d', strtotime($camp['date']));
+        $camp['date'] = !empty($camp['preferred_date']) ? date('Y-m-d', strtotime($camp['preferred_date'])) : '';
+        $camp['organization'] = $camp['organization_name'];
+        $camp['phone'] = $camp['phone_number'];
+        $camp['expected_participants'] = $camp['expected_donors'];
+        // Remove old field names to avoid confusion
+        unset($camp['preferred_date'], $camp['organization_name'], $camp['phone_number'], $camp['expected_donors']);
     }
     
     echo json_encode([

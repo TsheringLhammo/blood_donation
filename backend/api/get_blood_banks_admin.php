@@ -103,6 +103,34 @@ function fallback_banks_admin(): array {
             'is_active' => 1,
         ],
         [
+            'id' => 9,
+            'name' => 'Bumthang Blood Bank',
+            'hospital' => 'Bumthang District Hospital',
+            'dzongkhag' => 'Bumthang',
+            'address' => 'Jakar, Bumthang',
+            'phone' => '03-631116',
+            'emergency_phone' => '03-631116',
+            'email' => 'info@bumthang-bb.bt',
+            'hours' => 'Mon-Fri: 9:00 AM - 3:30 PM',
+            'hours_json' => json_encode([
+                'mon' => ['start' => '09:00', 'end' => '15:30'],
+                'tue' => ['start' => '09:00', 'end' => '15:30'],
+                'wed' => ['start' => '09:00', 'end' => '15:30'],
+                'thu' => ['start' => '09:00', 'end' => '15:30'],
+                'fri' => ['start' => '09:00', 'end' => '15:30'],
+                'sat' => ['open' => false],
+                'sun' => ['open' => false],
+            ]),
+            'emergency' => 'Emergency on call',
+            'latitude' => null,
+            'longitude' => null,
+            'services_json' => json_encode(['Blood Donation', 'Screening']),
+            'status' => 'open',
+            'directory_status' => 'active',
+            'types_csv' => 'O+, A+',
+            'is_active' => 1,
+        ],
+        [
             'id' => 3,
             'name' => 'Mongar Blood Bank',
             'hospital' => 'Mongar Regional Referral Hospital',
@@ -131,6 +159,37 @@ function fallback_banks_admin(): array {
             'is_active' => 1,
         ],
     ];
+}
+
+function default_inventory_admin(): array {
+    $bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    $components = ['PRBC', 'Platelets', 'FFP', 'Wholeblood'];
+    $inventory = [];
+    foreach ($components as $component) {
+        $inventory[$component] = [];
+        foreach ($bloodTypes as $bloodType) {
+            $inventory[$component][$bloodType] = ['units' => 0, 'min' => 5];
+        }
+    }
+    return $inventory;
+}
+
+function build_inventory_admin(array $rows): array {
+    $inventory = default_inventory_admin();
+    foreach ($rows as $row) {
+        $bloodType = (string)($row['blood_type'] ?? '');
+        if ($bloodType === '') {
+            continue;
+        }
+        if (!isset($inventory['Wholeblood'][$bloodType])) {
+            continue;
+        }
+        $inventory['Wholeblood'][$bloodType]['units'] = (int)($row['whole_units'] ?? 0);
+        $inventory['PRBC'][$bloodType]['units'] = (int)($row['prbc_units'] ?? 0);
+        $inventory['Platelets'][$bloodType]['units'] = (int)($row['platelets_units'] ?? 0);
+        $inventory['FFP'][$bloodType]['units'] = (int)($row['ffp_units'] ?? 0);
+    }
+    return $inventory;
 }
 
 try {
@@ -174,6 +233,7 @@ try {
             'availabilityStatus' => (string)($row['status'] ?: 'open'),
             'status' => (string)($row['directory_status'] ?: (($row['is_active'] ?? 1) ? 'active' : 'inactive')),
             'types' => $types,
+            'inventory' => is_array($row['inventory'] ?? null) ? $row['inventory'] : default_inventory_admin(),
             'isActive' => (int)($row['is_active'] ?? 1) === 1,
         ];
     };
@@ -306,6 +366,33 @@ try {
     $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $inventoryByBank = [];
+    if (table_exists_admin($pdo, 'tblinventory')) {
+        try {
+            $inventoryStmt = $pdo->query('SELECT blood_bank_id, blood_type, whole_units, prbc_units, platelets_units, ffp_units FROM tblinventory');
+            foreach ($inventoryStmt->fetchAll(PDO::FETCH_ASSOC) as $inventoryRow) {
+                $bankId = (int)($inventoryRow['blood_bank_id'] ?? 0);
+                if ($bankId <= 0) {
+                    continue;
+                }
+                if (!isset($inventoryByBank[$bankId])) {
+                    $inventoryByBank[$bankId] = [];
+                }
+                $inventoryByBank[$bankId][] = $inventoryRow;
+            }
+        } catch (Throwable $ignored) {
+            $inventoryByBank = [];
+        }
+    }
+
+    $rows = array_map(static function (array $row) use ($inventoryByBank): array {
+        $bankId = (int)$row['id'];
+        $row['inventory'] = isset($inventoryByBank[$bankId])
+            ? build_inventory_admin($inventoryByBank[$bankId])
+            : default_inventory_admin();
+        return $row;
+    }, $rows);
 
     $data = array_map($mapRow, $rows);
 

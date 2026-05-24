@@ -10,6 +10,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [latestNotification, setLatestNotification] = useState(null);
   const [appointments, setAppointments] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -51,10 +52,39 @@ export default function Dashboard() {
       });
       const data = await res.json();
       if (data.success) {
-        setAppointments(data.data);
-      } else {
-        setAppointments([]);
-      }
+          // Normalize status for UI consistency (add status_key and status_label)
+          const normalizeAppointmentStatus = (value) => {
+            const status = String(value || "").trim().toLowerCase();
+            if (['completed', 'complete', 'done'].includes(status)) return 'completed';
+            if (['deferred', 'defer'].includes(status)) return 'deferred';
+            if (['cancelled', 'canceled', 'rejected', 'reject'].includes(status)) return 'cancelled';
+            if (['confirmed', 'confirm'].includes(status)) return 'confirmed';
+            if (!status || status === 'pending') return 'pending';
+            return status;
+          };
+          const getAppointmentStatusLabel = (value) => {
+            switch (normalizeAppointmentStatus(value)) {
+              case 'completed': return 'Completed';
+              case 'deferred': return 'Deferred';
+              case 'cancelled': return 'Cancelled';
+              case 'confirmed': return 'Confirmed';
+              case 'pending': return 'Pending';
+              default: return value ? String(value) : 'Pending';
+            }
+          };
+
+          const normalized = Array.isArray(data.data) ? data.data.map((row) => {
+            const status_key = normalizeAppointmentStatus(row.status);
+            return {
+              ...row,
+              status_key,
+              status_label: getAppointmentStatusLabel(row.status),
+            };
+          }) : [];
+          setAppointments(normalized);
+        } else {
+          setAppointments([]);
+        }
     } catch {
       setAppointments([]);
     } finally {
@@ -96,18 +126,34 @@ export default function Dashboard() {
     }
   }, []);
 
+  const fetchLatestNotification = useCallback(async () => {
+    try {
+      const res = await authFetch("donor_notifications_list.php?_ts=" + Date.now(), {
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+        setLatestNotification(data.data[0]);
+      }
+    } catch {
+      // Keep the last known notification if the request fails.
+    }
+  }, []);
+
   useEffect(() => {
     if (user) {
       fetchProfile();
+      fetchLatestNotification();
       fetchAppointments();
     }
-  }, [user, fetchAppointments, fetchProfile]);
+  }, [user, fetchAppointments, fetchLatestNotification, fetchProfile]);
 
   useEffect(() => {
     if (!user) return undefined;
 
     const refresh = () => {
       fetchProfile();
+      fetchLatestNotification();
     };
 
     const intervalId = window.setInterval(refresh, 30000);
@@ -117,7 +163,7 @@ export default function Dashboard() {
       window.clearInterval(intervalId);
       window.removeEventListener("focus", refresh);
     };
-  }, [user, fetchProfile]);
+  }, [user, fetchLatestNotification, fetchProfile]);
 
   const handleLogout = () => {
     clearAuthSession();
@@ -146,6 +192,7 @@ export default function Dashboard() {
   if (!user) return null;
 
   const normalize = (value) => String(value ?? "").trim().toLowerCase();
+  const normalizeStatus = (value) => normalize(value).replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
   const formatDate = (value) => {
     if (!value) return null;
     const parsed = new Date(value);
@@ -154,39 +201,59 @@ export default function Dashboard() {
       : parsed.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   };
 
-  const initialApprovalStatus = normalize(profile?.initial_approval_status);
-  const finalDecision = normalize(profile?.final_decision);
-  const workflowStatus = normalize(profile?.workflow_status);
+  const initialApprovalStatus = normalizeStatus(profile?.initial_approval_status);
+  const finalDecision = normalizeStatus(profile?.final_decision);
+  const workflowStatus = normalizeStatus(profile?.workflow_status);
+  const currentStatus = normalizeStatus(profile?.current_status);
+  const profileStatus = normalizeStatus(profile?.status);
+  const notificationText = normalizeStatus(`${latestNotification?.title ?? ""} ${latestNotification?.message ?? ""}`);
   const deferredUntil = profile?.defer_until_date || profile?.deferred_until || null;
   const deferredUntilLabel = formatDate(deferredUntil);
 
-  const actualDonorStatus = (() => {
-    const approvedToDonateStatuses = new Set(["approved_for_blood_draw", "approved_to_donate"]);
-    const approvedDonorStatuses = new Set(["approved_donor", "decision_made_accepted", "active_donor"]);
-    const testedNegativeStatuses = new Set(["tested_negative", "test_result_negative", "blood_donated"]);
-    const temporarilyDeferredStatuses = new Set(["temp_defer", "deferred_until_date", "decision_made_deferred", "deferred", "temporarily_deferred"]);
-    const permanentlyDeferredStatuses = new Set(["perm_defer", "permanently_deferred", "permanent_deferral", "permanently deferred"]);
-    const statusValue = normalize(profile?.status);
-    const sampleTestedValue = normalize(profile?.sample_tested);
-    const hasCollectedSample = workflowStatus === "blood_drawn_pending_test" || sampleTestedValue === "collected";
-    const hasPendingApprovedDonorState = statusValue === "approved to donate" && !["negative", "reactive"].includes(sampleTestedValue);
-
-    if (permanentlyDeferredStatuses.has(finalDecision) || permanentlyDeferredStatuses.has(workflowStatus)) {
+  const notificationOverrideStatus = (() => {
+    if (!notificationText) return null;
+    if (notificationText.includes("permanent deferral") || notificationText.includes("permanently deferred")) {
       return "permanently_deferred";
     }
-    if (temporarilyDeferredStatuses.has(finalDecision) || temporarilyDeferredStatuses.has(workflowStatus)) {
+    if (notificationText.includes("temporary deferral") || notificationText.includes("temporarily deferred")) {
       return "temporarily_deferred";
     }
-    if (approvedDonorStatuses.has(finalDecision) || approvedDonorStatuses.has(workflowStatus)) {
+    if (notificationText.includes("approved donor") || notificationText.includes("approved to donate") || notificationText.includes("eligible to donate")) {
       return "approved_donor";
     }
-    if (workflowStatus === "test_result_pending_decision" || sampleTestedValue === "negative") {
+    return null;
+  })();
+
+  const actualDonorStatus = (() => {
+    if (notificationOverrideStatus) {
+      return notificationOverrideStatus;
+    }
+
+    const approvedToDonateStatuses = new Set(["approved for blood draw", "approved to donate", "confirmed", "eligible", "active"]);
+    const approvedDonorStatuses = new Set(["approved donor", "decision made accepted", "active donor", "confirmed"]);
+    const testedNegativeStatuses = new Set(["tested negative", "test result negative", "blood donated", "negative"]);
+    const temporarilyDeferredStatuses = new Set(["temp defer", "deferred until date", "decision made deferred", "deferred", "temporarily deferred", "temporary defer"]);
+    const permanentlyDeferredStatuses = new Set(["perm defer", "permanently deferred", "permanent deferral"]);
+    const sampleTestedValue = normalizeStatus(profile?.sample_tested);
+    const hasCollectedSample = workflowStatus === "blood_drawn_pending_test" || sampleTestedValue === "collected";
+    const hasPendingApprovedDonorState = profileStatus === "approved to donate" && !["negative", "reactive"].includes(sampleTestedValue);
+
+    if (permanentlyDeferredStatuses.has(finalDecision) || permanentlyDeferredStatuses.has(workflowStatus) || permanentlyDeferredStatuses.has(currentStatus) || permanentlyDeferredStatuses.has(profileStatus)) {
+      return "permanently_deferred";
+    }
+    if (temporarilyDeferredStatuses.has(finalDecision) || temporarilyDeferredStatuses.has(workflowStatus) || temporarilyDeferredStatuses.has(currentStatus) || temporarilyDeferredStatuses.has(profileStatus)) {
+      return "temporarily_deferred";
+    }
+    if (approvedDonorStatuses.has(finalDecision) || approvedDonorStatuses.has(workflowStatus) || approvedDonorStatuses.has(currentStatus) || approvedDonorStatuses.has(profileStatus)) {
+      return "approved_donor";
+    }
+    if (workflowStatus === "test result pending decision" || currentStatus === "pending review" || sampleTestedValue === "negative") {
       return "awaiting_review";
     }
-    if (testedNegativeStatuses.has(finalDecision) || testedNegativeStatuses.has(workflowStatus)) {
+    if (testedNegativeStatuses.has(finalDecision) || testedNegativeStatuses.has(workflowStatus) || testedNegativeStatuses.has(currentStatus) || testedNegativeStatuses.has(profileStatus)) {
       return "tested_negative";
     }
-    if (hasCollectedSample || hasPendingApprovedDonorState || approvedToDonateStatuses.has(initialApprovalStatus) || approvedToDonateStatuses.has(finalDecision) || approvedToDonateStatuses.has(workflowStatus)) {
+    if (hasCollectedSample || hasPendingApprovedDonorState || approvedToDonateStatuses.has(initialApprovalStatus) || approvedToDonateStatuses.has(finalDecision) || approvedToDonateStatuses.has(workflowStatus) || approvedToDonateStatuses.has(currentStatus) || approvedToDonateStatuses.has(profileStatus)) {
       return "awaiting_review";
     }
     return "awaiting_review";
@@ -230,8 +297,8 @@ export default function Dashboard() {
   const showStatusBanner = !loading && profile;
 
   const today = new Date().toISOString().split("T")[0];
-  const upcoming  = appointments ? appointments.filter(a => a.preferred_date >= today && a.status !== "rejected") : [];
-  const confirmed = appointments ? appointments.filter(a => a.status === "confirmed") : [];
+  const upcoming  = appointments ? appointments.filter(a => a.preferred_date >= today && ((a.status_key || String(a.status || '').toLowerCase()) !== "rejected")) : [];
+  const confirmed = appointments ? appointments.filter(a => (a.status_key || String(a.status || '').toLowerCase()) === "confirmed") : [];
   const totalCount = appointments ? appointments.length : 0;
 
   return (
@@ -354,8 +421,8 @@ export default function Dashboard() {
                         <td>{a.blood_bank}</td>
                         <td>{a.blood_group ? <span className="dash-blood-badge">{a.blood_group}</span> : "—"}</td>
                         <td>
-                          <span className={`dash-badge ${a.status === "confirmed" ? "completed" : a.status === "rejected" ? "rejected" : "upcoming"}`}>
-                            {a.status === "confirmed" ? "Confirmed" : a.status === "rejected" ? "Rejected" : "Pending"}
+                          <span className={`dash-badge ${(a.status_key || String(a.status || '').toLowerCase()) === "completed" ? "completed" : (a.status_key || String(a.status || '').toLowerCase()) === "rejected" ? "rejected" : "upcoming"}`}>
+                            {a.status_label || ((a.status === "confirmed") ? "Confirmed" : a.status === "rejected" ? "Rejected" : "Pending")}
                           </span>
                         </td>
                       </tr>
@@ -390,8 +457,8 @@ export default function Dashboard() {
                         <td>{h.blood_bank}</td>
                         <td>{h.blood_group ? <span className="dash-blood-badge">{h.blood_group}</span> : "—"}</td>
                         <td>
-                          <span className={`dash-badge ${h.status === "confirmed" ? "completed" : h.status === "rejected" ? "rejected" : "upcoming"}`}>
-                            {h.status === "confirmed" ? "Confirmed" : h.status === "rejected" ? "Rejected" : "Pending"}
+                          <span className={`dash-badge ${(h.status_key || String(h.status || '').toLowerCase()) === "completed" ? "completed" : (h.status_key || String(h.status || '').toLowerCase()) === "rejected" ? "rejected" : "upcoming"}`}>
+                            {h.status_label || ((h.status === "confirmed") ? "Confirmed" : h.status === "rejected" ? "Rejected" : "Pending")}
                           </span>
                         </td>
                       </tr>

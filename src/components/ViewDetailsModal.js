@@ -1,8 +1,76 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import './ViewDetailsModal.css';
 
-const ViewDetailsModal = ({ isOpen, onClose, type, data }) => {
+const ViewDetailsModal = ({ isOpen, onClose, type, data, onAppointmentAction }) => {
+  const [appointmentData, setAppointmentData] = useState(data);
+  const [actionLoading, setActionLoading] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setAppointmentData(data);
+      setActionLoading('');
+    }
+  }, [isOpen, data]);
+
   if (!isOpen || !data) return null;
+
+  const normalizedAppointmentStatus = String(appointmentData?.status || data?.status || '').trim().toLowerCase();
+  const appointmentStatusLabel = (() => {
+    switch (normalizedAppointmentStatus) {
+      case 'completed':
+        return 'Completed';
+      case 'deferred':
+        return 'Deferred';
+      case 'cancelled':
+      case 'canceled':
+        return 'Cancelled';
+      case 'confirmed':
+        return 'Confirmed';
+      case 'pending':
+        return 'Pending';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return appointmentData?.status || data?.status || 'Pending';
+    }
+  })();
+
+  const appointmentStatusClass = (() => {
+    switch (normalizedAppointmentStatus) {
+      case 'completed':
+        return 'completed';
+      case 'deferred':
+        return 'rejected';
+      case 'cancelled':
+      case 'canceled':
+      case 'rejected':
+        return 'rejected';
+      case 'confirmed':
+        return 'confirmed';
+      case 'pending':
+      default:
+        return 'pending';
+    }
+  })();
+
+  const canManageAppointment = normalizedAppointmentStatus === 'confirmed';
+
+  const handleAppointmentAction = async (action) => {
+    if (!canManageAppointment || typeof onAppointmentAction !== 'function') return;
+
+    try {
+      setActionLoading(action);
+      const result = await onAppointmentAction(action, appointmentData || data);
+      if (result?.success) {
+        setAppointmentData((prev) => ({
+          ...(prev || data),
+          status: result.status || prev?.status || data.status,
+        }));
+      }
+    } finally {
+      setActionLoading('');
+    }
+  };
 
   const renderAppointmentDetails = () => (
     <div className="details-content">
@@ -28,10 +96,38 @@ const ViewDetailsModal = ({ isOpen, onClose, type, data }) => {
         </div>
         <div className="detail-row">
           <span className="detail-label">Status:</span>
-          <span className={`detail-value status-badge ${data.status}`}>
-            {data.status}
+          <span className={`detail-value status-badge ${appointmentStatusClass}`}>
+            {appointmentStatusLabel}
           </span>
         </div>
+        {canManageAppointment && (
+          <div className="appointment-actions">
+            <button
+              type="button"
+              className="appointment-action-btn completed"
+              onClick={() => handleAppointmentAction('completed')}
+              disabled={actionLoading !== ''}
+            >
+              {actionLoading === 'completed' ? 'Processing...' : 'Mark as Completed'}
+            </button>
+            <button
+              type="button"
+              className="appointment-action-btn deferred"
+              onClick={() => handleAppointmentAction('deferred')}
+              disabled={actionLoading !== ''}
+            >
+              {actionLoading === 'deferred' ? 'Processing...' : 'Mark as Deferred'}
+            </button>
+            <button
+              type="button"
+              className="appointment-action-btn cancelled"
+              onClick={() => handleAppointmentAction('cancelled')}
+              disabled={actionLoading !== ''}
+            >
+              {actionLoading === 'cancelled' ? 'Processing...' : 'Cancel Appointment'}
+            </button>
+          </div>
+        )}
         {data.email && (
           <div className="detail-row">
             <span className="detail-label">Email:</span>

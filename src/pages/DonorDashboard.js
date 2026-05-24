@@ -16,6 +16,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authFetch } from '../utils/auth';
 import EditProfile from '../components/EditProfile';
+import { maskCidNumber } from '../utils/strings';
 import './DonorDashboard.css';
 
 const DonorDashboard = () => {
@@ -282,6 +283,10 @@ const DonorDashboard = () => {
             <label>Email</label>
             <value>{profile.email}</value>
           </div>
+            <div className="profile-item">
+              <label>CID Number</label>
+              <value>{profile.cid_number_masked || maskCidNumber(profile.cid_number) || 'Not available'}</value>
+            </div>
           <div className="profile-item">
             <label>Blood Type</label>
             <value>{profile.blood_type || 'Not specified'}</value>

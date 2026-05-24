@@ -128,6 +128,27 @@ try {
     $malariaResult = $normalizeResult($malaria);
 
     $extraDiseases = is_array($payload['extra_diseases'] ?? null) ? $payload['extra_diseases'] : [];
+    $deferralDecision = strtolower(trim((string)($payload['deferral_decision'] ?? '')));
+    $deferralPeriod = trim((string)($payload['deferral_period'] ?? ''));
+    $deferralReason = trim((string)($payload['deferral_reason'] ?? ''));
+
+    $staffDecisionLabel = 'Approved';
+    if ($deferralDecision === 'temporary') {
+        $staffDecisionLabel = 'Temporary deferral' . ($deferralPeriod !== '' ? ' (' . $deferralPeriod . ')' : '');
+    } elseif ($deferralDecision === 'permanent') {
+        $staffDecisionLabel = 'Permanent deferral';
+        if ($deferralReason !== '') {
+            $staffDecisionLabel .= ' - ' . $deferralReason;
+        }
+    }
+
+    $notesWithStaffDecision = $notes;
+    $staffDecisionNote = 'Staff decision: ' . $staffDecisionLabel;
+    if ($notesWithStaffDecision !== '') {
+        $notesWithStaffDecision .= PHP_EOL . $staffDecisionNote;
+    } else {
+        $notesWithStaffDecision = $staffDecisionNote;
+    }
 
     // Determine which tests are reactive
     $reactiveTests = [];
@@ -184,12 +205,35 @@ try {
         $syphilisResult,
         $malariaResult,
         $testedBy,
-        $notes,
+        $notesWithStaffDecision,
         $sampleStatus,
         $testStatus,
         $positiveList ?: null,
         $sampleId,
     ]);
+
+    // If the schema supports storing structured staff decisions, write them too.
+    $sampleCols = workflow_table_columns($pdo, 'tbldonor_samples');
+    $staffFieldsToUpdate = [];
+    $staffValues = [];
+    if (in_array('staff_decision', $sampleCols, true)) {
+        $staffFieldsToUpdate[] = 'staff_decision = ?';
+        $staffValues[] = $deferralDecision ?: 'approve';
+    }
+    if (in_array('staff_deferral_period', $sampleCols, true)) {
+        $staffFieldsToUpdate[] = 'staff_deferral_period = ?';
+        $staffValues[] = $deferralPeriod ?: null;
+    }
+    if (in_array('staff_deferral_reason', $sampleCols, true)) {
+        $staffFieldsToUpdate[] = 'staff_deferral_reason = ?';
+        $staffValues[] = $deferralReason ?: null;
+    }
+    if (!empty($staffFieldsToUpdate)) {
+        $staffValues[] = $sampleId;
+        $sql = 'UPDATE tbldonor_samples SET ' . implode(', ', $staffFieldsToUpdate) . ' WHERE id = ?';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($staffValues);
+    }
 
     // Update tbldonors table with the tested state only.
     // Final donor approval/deferral is applied after admin review.
@@ -251,8 +295,8 @@ try {
         ? 'Sample Test Needs Review: Positive Result'
         : 'Sample Test Ready for Review';
     $adminNotificationMessage = $hasReactive
-        ? 'Staff recorded a positive sample result for ' . $sample['donor_name'] . ' (' . $positiveList . '). Please review and accept/defer the case.'
-        : 'Staff recorded a non-reactive sample result for ' . $sample['donor_name'] . '. Please review and accept the case.';
+        ? 'Staff recorded a positive sample result for ' . $sample['donor_name'] . ' (' . $positiveList . '). ' . $staffDecisionNote . ' Please review and approve the case.'
+        : 'Staff recorded a non-reactive sample result for ' . $sample['donor_name'] . '. ' . $staffDecisionNote . ' Please review and approve the case.';
     $adminNotificationSeverity = $hasReactive ? 'critical' : 'warning';
 
     workflow_insert_notification($pdo, [

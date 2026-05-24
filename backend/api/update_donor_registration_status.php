@@ -124,12 +124,12 @@ try {
         'message' => $message,
         'type' => $approvalStatus === 'approved' ? 'approval' : 'rejection',
         'severity' => $approvalStatus === 'approved' ? 'info' : 'warning',
-        'channel' => 'both',
+        'channel' => $approvalStatus === 'approved' ? 'in_app' : 'both',
         'is_read' => 0,
         'created_at' => date('Y-m-d H:i:s'),
     ]);
 
-    if ($donorEmail !== '' && filter_var($donorEmail, FILTER_VALIDATE_EMAIL)) {
+    if ($approvalStatus === 'rejected' && $donorEmail !== '' && filter_var($donorEmail, FILTER_VALIDATE_EMAIL)) {
         $subject = $approvalStatus === 'approved' ? 'Blood Donation Registration Approved' : 'Blood Donation Registration Update';
         $body = $message . "\n\nThank you,\nBlood Bank";
         bts_send_email($donorEmail, $subject, $body, nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8')));

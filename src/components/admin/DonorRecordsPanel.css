@@ -1,0 +1,1177 @@
+.donor-records-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.donor-records-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.donor-records-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 18px 20px 16px;
+  background: linear-gradient(180deg, #fffdfb 0%, #fff7f1 100%);
+  border: 1px solid #eadccf;
+  box-shadow: 0 12px 26px rgba(82, 37, 18, 0.06);
+}
+
+.donor-records-hero::before {
+  content: '';
+  position: absolute;
+  inset: -40px auto auto -40px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(190, 18, 60, 0.18), rgba(190, 18, 60, 0));
+  pointer-events: none;
+}
+
+.donor-records-hero::after {
+  content: '';
+  position: absolute;
+  inset: auto -40px -60px auto;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(120, 25, 34, 0.12), rgba(120, 25, 34, 0));
+  pointer-events: none;
+}
+
+.donor-records-hero-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.donor-records-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8b5b52;
+  margin-bottom: 8px;
+}
+
+.donor-records-title {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  color: #5a0010;
+}
+
+.donor-records-subtitle {
+  margin: 8px 0 0;
+  max-width: 760px;
+  color: #7a665d;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.donor-records-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.donor-records-stat {
+  background: #fff;
+  border: 1px solid #eadccf;
+  border-radius: 20px;
+  padding: 16px 18px;
+  box-shadow: 0 14px 34px rgba(77, 30, 10, 0.06);
+}
+
+.donor-records-stat-label {
+  margin: 0 0 8px;
+  color: #8f6f62;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.donor-records-stat-value {
+  margin: 0;
+  color: #640010;
+  font-size: 30px;
+  line-height: 1.05;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+}
+
+.donor-records-toolbar {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 18px;
+  border-radius: 18px;
+  border: 1px solid #eadfd4;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(255, 249, 244, 0.98));
+  box-shadow: 0 12px 24px rgba(84, 29, 14, 0.06);
+}
+
+.donor-records-toolbar-labels {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(140px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.donor-records-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.donor-records-filter-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8c6a5d;
+  padding: 0 2px;
+}
+
+.donor-records-toolbar-inputs {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(140px, 1fr));
+  gap: 14px;
+  align-items: center;
+}
+
+.donor-records-toolbar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 2px;
+  flex-wrap: wrap;
+}
+
+.donor-records-search,
+.donor-records-select {
+  width: 100%;
+  border: 1.5px solid #dccabb;
+  border-radius: 14px;
+  background: #fff;
+  color: #36231f;
+  padding: 12px 14px;
+  font: inherit;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.donor-records-search-wrap { position: relative; display: flex; align-items: center; }
+.donor-records-search-icon { position: absolute; left: 14px; color: #b35a52; font-size: 14px; pointer-events: none; }
+.donor-records-search { padding-left: 38px; }
+
+.donor-records-search:focus,
+.donor-records-select:focus {
+  outline: none;
+  border-color: #8b0017;
+  box-shadow: 0 0 0 4px rgba(139, 0, 23, 0.12);
+}
+
+.donor-records-button {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 11px 16px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+  white-space: nowrap;
+}
+
+.donor-records-button:hover {
+  transform: translateY(-1px);
+}
+
+.donor-records-button.primary {
+  background: linear-gradient(135deg, #8b0017, #b30020);
+  color: #fff;
+  box-shadow: 0 12px 20px rgba(139, 0, 23, 0.14);
+}
+
+.donor-records-button.secondary {
+  background: #fff;
+  color: #7b0013;
+  border-color: #d8c7bc;
+}
+
+.donor-records-button.ghost {
+  background: #fff7f1;
+  color: #7b0013;
+  border-color: #ecd7cb;
+}
+
+.donor-records-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.donor-records-card {
+  background: #fff;
+  border: 1px solid #eadfd4;
+  border-radius: 18px;
+  box-shadow: 0 12px 24px rgba(77, 30, 10, 0.07);
+  overflow: hidden;
+}
+
+.donor-records-card-head {
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid #efe3d7;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  background: linear-gradient(180deg, #fff, #fff8f3);
+}
+
+.donor-records-card-head h3 {
+  margin: 0;
+  color: #59000e;
+  font-size: 18px;
+}
+
+.donor-records-card-head p {
+  margin: 4px 0 0;
+  color: #8c7160;
+  font-size: 13px;
+}
+
+.donor-records-table-wrap {
+  overflow-x: auto;
+}
+
+.donor-records-table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.donor-records-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fcf8f5;
+  color: #8a6b5d;
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 12px 10px;
+  border-bottom: 1px solid #efe3d7;
+  word-break: break-word;
+  white-space: nowrap;
+}
+
+.donor-records-table tbody td {
+  padding: 13px 10px;
+  border-bottom: 1px solid #f1e6da;
+  color: #35221d;
+  vertical-align: middle;
+  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.donor-records-table thead th:nth-child(2),
+.donor-records-table tbody td:nth-child(2) {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.donor-records-table tbody tr:nth-child(even) {
+  background: #fefaf7;
+}
+
+.donor-records-table tbody tr:hover {
+  background: #fff2ea;
+}
+
+.donor-records-code {
+  display: inline-block;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.donor-records-name {
+  font-weight: 800;
+  color: #5b0010;
+}
+
+.donor-records-muted {
+  display: block;
+  color: #8a6b5d;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.donor-records-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.donor-records-action-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d9c7b8;
+  background: #fff;
+  color: #6a0012;
+  border-radius: 10px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.donor-records-action-btn:hover {
+  transform: translateY(-1px);
+  border-color: #b30020;
+  box-shadow: 0 10px 18px rgba(96, 15, 32, 0.08);
+}
+
+.donor-records-action-btn.view {
+  background: #f6fbff;
+}
+
+.donor-records-action-btn.edit {
+  background: #fff8f6;
+}
+
+.donor-records-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.donor-records-badge::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+.donor-records-badge.active {
+  background: #ddf9e8;
+  color: #167a3a;
+}
+
+.donor-records-badge.pending {
+  background: #fff2c8;
+  color: #8d5a00;
+}
+
+.donor-records-badge.deferred {
+  background: #ffe0e0;
+  color: #a51424;
+}
+
+.donor-records-badge.none {
+  background: #eef2f7;
+  color: #526170;
+}
+
+.donor-records-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 20px 18px;
+  color: #6c574d;
+  flex-wrap: wrap;
+}
+
+.donor-records-footer-left {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.donor-records-pagination {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.donor-records-page-numbers {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.donor-records-page-number {
+  min-width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid #d8c7bc;
+  background: #fff;
+  color: #6a0012;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0 12px;
+}
+
+.donor-records-page-number.active {
+  background: linear-gradient(135deg, #8b0017, #b30020);
+  color: #fff;
+  border-color: transparent;
+}
+
+.donor-records-page-number:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.donor-records-page-indicator {
+  font-size: 13px;
+  font-weight: 800;
+  color: #5c0010;
+}
+
+.donor-records-empty,
+.donor-records-loading,
+.donor-records-error {
+  padding: 34px 24px;
+  text-align: center;
+  color: #735c52;
+}
+
+.donor-records-error {
+  color: #a51424;
+}
+
+.donor-records-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(29, 8, 12, 0.58);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 18px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.donor-records-modal {
+  width: min(1180px, 100%);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  -webkit-overflow-scrolling: touch;
+}
+
+.donor-records-modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 20px 24px 16px;
+  background: linear-gradient(135deg, #7b0013, #b1001d);
+  color: #fff;
+}
+
+.donor-records-modal-header h3 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.donor-records-modal-header p {
+  margin: 6px 0 0;
+  opacity: 0.88;
+}
+
+.donor-records-close-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.donor-records-modal-summary,
+.donor-records-modal-basic,
+.donor-records-modal-tabs,
+.donor-records-modal-body,
+.donor-records-modal-actions {
+  padding: 18px 24px;
+}
+
+.donor-records-modal-summary {
+  border-bottom: 1px solid #efdfd2;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  background: linear-gradient(180deg, #fff, #fffaf6);
+}
+
+.donor-records-summary-box {
+  padding: 14px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #edded0;
+}
+
+.donor-records-summary-box span {
+  display: block;
+  margin-bottom: 8px;
+  color: #8b6c5e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.donor-records-summary-box strong {
+  font-size: 18px;
+  color: #5d0010;
+}
+
+.donor-records-modal-basic {
+  border-bottom: 1px solid #efdfd2;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.donor-records-basic-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #fffaf8;
+  border: 1px solid #f0dfd3;
+}
+
+.donor-records-basic-item span {
+  display: block;
+  color: #8b6c5e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.donor-records-basic-item strong {
+  color: #442018;
+  font-size: 15px;
+}
+
+.donor-records-modal-tabs {
+  border-bottom: 1px solid #efdfd2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: #fffefc;
+}
+
+.donor-records-tab-btn {
+  border: 1px solid #decaba;
+  border-radius: 999px;
+  background: #fff;
+  color: #6c0011;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.donor-records-tab-btn.active {
+  background: linear-gradient(135deg, #8b0017, #b30020);
+  color: #fff;
+  border-color: transparent;
+}
+
+.donor-records-modal-body {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow: visible;
+  background: #fff;
+}
+
+.donor-records-modal-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+}
+
+.donor-records-section-title {
+  margin: 0 0 12px;
+  color: #4d0010;
+  font-size: 18px;
+}
+
+.donor-records-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.donor-records-detail-card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #eeddcf;
+  background: #fffaf7;
+}
+
+.donor-records-detail-card span {
+  display: block;
+  color: #8b6c5e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.donor-records-detail-card strong {
+  color: #441d18;
+  font-size: 15px;
+}
+
+.donor-records-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 820px;
+}
+
+.donor-records-history-table th,
+.donor-records-history-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1e6da;
+  text-align: left;
+}
+
+.donor-records-history-table th {
+  color: #8a6b5d;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: #fff8f4;
+}
+
+.donor-records-modal-actions {
+  border-top: 1px solid #efdfd2;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: linear-gradient(180deg, #fffefc, #fff7f2);
+}
+
+.donor-records-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.donor-records-form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.donor-records-form-field label {
+  color: #7b5f54;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.donor-records-form-field input,
+.donor-records-form-field textarea {
+  width: 100%;
+  border: 1.5px solid #dbc8ba;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font: inherit;
+  color: #35221d;
+  background: #fff;
+}
+
+.donor-records-form-field input:read-only {
+  background: #f8f2ec;
+}
+
+.donor-records-form-field textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.donor-records-form-full {
+  grid-column: 1 / -1;
+}
+
+.donor-records-form-note {
+  color: #8b6c5e;
+  font-size: 13px;
+}
+
+/* Tablet and smaller desktops */
+@media (max-width: 1100px) {
+  .donor-records-toolbar-labels,
+  .donor-records-toolbar-inputs {
+    grid-template-columns: minmax(200px, 1fr) repeat(3, minmax(100px, 1fr));
+  }
+
+  .donor-records-toolbar-actions {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .donor-records-hero-grid,
+  .donor-records-modal-summary,
+  .donor-records-modal-basic,
+  .donor-records-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .donor-records-modal-summary {
+    gap: 10px;
+  }
+
+  .donor-records-title {
+    font-size: clamp(24px, 3vw, 36px);
+  }
+
+  .donor-records-subtitle {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+}
+
+@media (min-width: 1200px) {
+  .donor-records-table thead th:nth-child(1),
+  .donor-records-table tbody td:nth-child(1) { width: 58px; }
+  .donor-records-table thead th:nth-child(2),
+  .donor-records-table tbody td:nth-child(2) { width: 108px; }
+  .donor-records-table thead th:nth-child(3),
+  .donor-records-table tbody td:nth-child(3) { width: 170px; }
+  .donor-records-table thead th:nth-child(4),
+  .donor-records-table tbody td:nth-child(4) { width: 92px; }
+  .donor-records-table thead th:nth-child(5),
+  .donor-records-table tbody td:nth-child(5) { width: 104px; }
+  .donor-records-table thead th:nth-child(6),
+  .donor-records-table tbody td:nth-child(6) { width: 122px; }
+  .donor-records-table thead th:nth-child(7),
+  .donor-records-table tbody td:nth-child(7) { width: 132px; }
+  .donor-records-table thead th:nth-child(8),
+  .donor-records-table tbody td:nth-child(8) { width: 132px; }
+  .donor-records-table thead th:nth-child(9),
+  .donor-records-table tbody td:nth-child(9) { width: 112px; }
+  .donor-records-table thead th:nth-child(10),
+  .donor-records-table tbody td:nth-child(10) { width: 112px; }
+  .donor-records-table thead th:nth-child(11),
+  .donor-records-table tbody td:nth-child(11) { width: 110px; }
+  .donor-records-table thead th:nth-child(12),
+  .donor-records-table tbody td:nth-child(12) { width: 132px; }
+}
+
+/* Mobile devices */
+@media (max-width: 768px) {
+  .donor-records-panel {
+    gap: 12px;
+  }
+
+  .donor-records-hero {
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .donor-records-hero::before,
+  .donor-records-hero::after {
+    opacity: 0.5;
+  }
+
+  .donor-records-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .donor-records-title {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+
+  .donor-records-subtitle {
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 0;
+  }
+
+  .donor-records-hero-note {
+    justify-items: stretch;
+    gap: 8px;
+  }
+
+  .donor-records-note-card {
+    padding: 12px;
+  }
+
+  .donor-records-toolbar {
+    gap: 10px;
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .donor-records-toolbar-labels {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .donor-records-filter-label {
+    font-size: 11px;
+    padding: 0 1px;
+  }
+
+  .donor-records-toolbar-inputs {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .donor-records-search-wrap,
+  .donor-records-select {
+    width: 100% !important;
+  }
+
+  .donor-records-toolbar-actions {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .donor-records-button {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .donor-records-card {
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .donor-records-card-head {
+    padding: 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .donor-records-card-head h3 {
+    font-size: 16px;
+    margin: 0;
+  }
+
+  .donor-records-card-head p {
+    font-size: 12px;
+    margin: 0;
+  }
+
+  .donor-records-table {
+    font-size: 12px;
+    min-width: auto;
+  }
+
+  .donor-records-table thead th {
+    padding: 10px 8px;
+    font-size: 10px;
+    white-space: normal;
+  }
+
+  .donor-records-table tbody td {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .donor-records-code {
+    font-size: 11px;
+    letter-spacing: 0.01em;
+  }
+
+  .donor-records-name {
+    font-size: 12px;
+  }
+
+  .donor-records-actions {
+    gap: 4px;
+  }
+
+  .donor-records-action-btn {
+    padding: 6px 8px;
+    font-size: 11px;
+    border-radius: 6px;
+  }
+
+  .donor-records-badge {
+    padding: 5px 8px;
+    font-size: 10px;
+    gap: 4px;
+  }
+
+  .donor-records-badge::before {
+    width: 6px;
+    height: 6px;
+  }
+
+  .donor-records-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .donor-records-footer-left {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .donor-records-pagination {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .donor-records-page-numbers {
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .donor-records-page-number {
+    min-width: 34px;
+    height: 34px;
+    font-size: 12px;
+    padding: 0 8px;
+  }
+
+  .donor-records-page-indicator {
+    font-size: 12px;
+  }
+
+  .donor-records-button.ghost {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  /* Modal responsive */
+  .donor-records-modal {
+    width: 95%;
+    max-height: calc(100dvh - 20px);
+    border-radius: 16px;
+  }
+
+  .donor-records-modal-header {
+    padding: 16px;
+  }
+
+  .donor-records-modal-header h3 {
+    font-size: 18px;
+  }
+
+  .donor-records-close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .donor-records-modal-summary {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .donor-records-summary-box {
+    padding: 10px;
+  }
+
+  .donor-records-summary-box span {
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+
+  .donor-records-summary-box strong {
+    font-size: 16px;
+  }
+
+  .donor-records-modal-basic {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .donor-records-basic-item {
+    padding: 10px;
+  }
+
+  .donor-records-basic-item span {
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+
+  .donor-records-basic-item strong {
+    font-size: 13px;
+  }
+
+  .donor-records-modal-tabs {
+    gap: 6px;
+    padding: 12px;
+  }
+
+  .donor-records-tab-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+    border-radius: 8px;
+  }
+
+  .donor-records-modal-body {
+    min-height: 100px;
+    padding: 12px;
+  }
+
+  .donor-records-detail-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .donor-records-detail-card {
+    padding: 10px;
+  }
+
+  .donor-records-detail-card span {
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+
+  .donor-records-detail-card strong {
+    font-size: 13px;
+  }
+
+  .donor-records-history-table {
+    font-size: 11px;
+    min-width: 100%;
+  }
+
+  .donor-records-history-table th,
+  .donor-records-history-table td {
+    padding: 8px 6px;
+  }
+
+  /* Form responsive */
+  .donor-records-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .donor-records-form-field {
+    margin-bottom: 8px;
+  }
+
+  .donor-records-form-field input,
+  .donor-records-form-field textarea {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  .donor-records-form-field label {
+    font-size: 12px;
+  }
+
+  .donor-records-form-note {
+    font-size: 11px;
+  }
+
+  .donor-records-modal-actions {
+    padding: 12px;
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .donor-records-modal-actions button {
+    width: 100%;
+  }
+}
+
+/* Small tablets and larger phones */
+@media (min-width: 769px) and (max-width: 900px) {
+  .donor-records-toolbar-labels,
+  .donor-records-toolbar-inputs {
+    grid-template-columns: minmax(200px, 1fr) 1fr 1fr;
+  }
+
+  .donor-records-toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .donor-records-hero-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .donor-records-modal-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .donor-records-modal-basic {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Medium tablets */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .donor-records-toolbar-labels,
+  .donor-records-toolbar-inputs {
+    grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(120px, 1fr));
+  }
+
+  .donor-records-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .donor-records-modal-summary {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .donor-records-modal-basic {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

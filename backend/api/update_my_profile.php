@@ -41,12 +41,13 @@ $pickColumn = static function (PDO $pdo, string $table, array $columns) use ($ha
 };
 
 try {
-    $claims = bts_require_auth(['donor']);
+    $claims = bts_require_auth(['donor', 'staff', 'admin', 'doctor']);
+    $role = trim((string)($claims['role'] ?? ''));
     $donorId = (int)($claims['donor_id'] ?? 0);
     $userId = (int)($claims['id'] ?? $claims['sub'] ?? 0);
     $tokenEmail = trim((string)($claims['email'] ?? ''));
 
-    if ($donorId <= 0) {
+    if ($role === 'donor' && $donorId <= 0) {
         http_response_code(401);
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit;
@@ -59,6 +60,172 @@ try {
         exit;
     }
 
+    if ($role !== 'donor') {
+        $fullName = trim((string)($payload['full_name'] ?? ''));
+        $email = trim((string)($payload['email'] ?? ''));
+        $phone = trim((string)($payload['phone'] ?? ''));
+        $dateOfBirth = trim((string)($payload['date_of_birth'] ?? ''));
+        $address = trim((string)($payload['address'] ?? ''));
+        $city = trim((string)($payload['city'] ?? ''));
+        $dzongkhag = trim((string)($payload['dzongkhag'] ?? ''));
+        $emergencyContactName = trim((string)($payload['emergency_contact_name'] ?? ''));
+        $emergencyContactPhone = trim((string)($payload['emergency_contact_phone'] ?? ''));
+        $assignedBloodBank = trim((string)($payload['assigned_blood_bank'] ?? ''));
+        $position = trim((string)($payload['position'] ?? ''));
+        $employeeId = trim((string)($payload['employee_id'] ?? ''));
+        $profilePicture = trim((string)($payload['profile_picture'] ?? ''));
+        $currentPassword = (string)($payload['current_password'] ?? '');
+        $newPassword = (string)($payload['new_password'] ?? '');
+        $confirmPassword = (string)($payload['confirm_password'] ?? '');
+
+        if ($fullName === '' || $email === '') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Full name and email are required.']);
+            exit;
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid email format.']);
+            exit;
+        }
+
+        if ($phone !== '' && !preg_match('/^(16|17|77)\d{6}$/', $phone)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Phone must be 8 digits and start with 16, 17, or 77.']);
+            exit;
+        }
+
+        $userCheck = $pdo->prepare('SELECT id FROM tblusers WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) AND id != ? LIMIT 1');
+        $userCheck->execute([$email, $userId]);
+        if ($userCheck->fetch(PDO::FETCH_ASSOC)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'Email is already in use by another account.']);
+            exit;
+        }
+
+        $usersPasswordColumn = $pickColumn($pdo, 'tblusers', ['password']);
+        $changingPassword = $newPassword !== '' || $currentPassword !== '' || $confirmPassword !== '';
+        if ($changingPassword) {
+            if ($newPassword === '' || $confirmPassword === '') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'New password and confirm password are required.']);
+                exit;
+            }
+            if ($newPassword !== $confirmPassword) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'New password and confirm password do not match.']);
+                exit;
+            }
+            if (strlen($newPassword) < 6) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'New password must be at least 6 characters.']);
+                exit;
+            }
+
+            if ($usersPasswordColumn) {
+                $passwordStmt = $pdo->prepare('SELECT ' . $usersPasswordColumn . ' AS password_hash FROM tblusers WHERE id = ? LIMIT 1');
+                $passwordStmt->execute([$userId]);
+                $storedPasswordHash = (string)($passwordStmt->fetch(PDO::FETCH_ASSOC)['password_hash'] ?? '');
+                if ($storedPasswordHash === '' || !password_verify($currentPassword, $storedPasswordHash)) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'message' => 'Current password is incorrect.']);
+                    exit;
+                }
+            }
+        }
+
+        $setParts = ['name = :full_name', 'email = :email'];
+        $params = [
+            ':full_name' => $fullName,
+            ':email' => $email,
+            ':user_id' => $userId,
+        ];
+
+        if ($hasColumn($pdo, 'tblusers', 'phone')) {
+            $setParts[] = 'phone = :phone';
+            $params[':phone'] = $phone !== '' ? $phone : null;
+        }
+        if ($hasColumn($pdo, 'tblusers', 'date_of_birth')) {
+            $setParts[] = 'date_of_birth = :date_of_birth';
+            $params[':date_of_birth'] = $dateOfBirth !== '' ? $dateOfBirth : null;
+        }
+        if ($hasColumn($pdo, 'tblusers', 'address')) {
+            $setParts[] = 'address = :address';
+            $params[':address'] = $address !== '' ? $address : null;
+        }
+        if ($hasColumn($pdo, 'tblusers', 'city')) {
+            $setParts[] = 'city = :city';
+            $params[':city'] = $city !== '' ? $city : null;
+        }
+        if ($hasColumn($pdo, 'tblusers', 'dzongkhag')) {
+            $setParts[] = 'dzongkhag = :dzongkhag';
+            $params[':dzongkhag'] = $dzongkhag !== '' ? $dzongkhag : null;
+        }
+        if ($hasColumn($pdo, 'tblusers', 'emergency_contact_name')) {
+            $setParts[] = 'emergency_contact_name = :emergency_contact_name';
+            $params[':emergency_contact_name'] = $emergencyContactName !== '' ? $emergencyContactName : null;
+        }
+        if ($hasColumn($pdo, 'tblusers', 'emergency_contact_phone')) {
+            $setParts[] = 'emergency_contact_phone = :emergency_contact_phone';
+            $params[':emergency_contact_phone'] = $emergencyContactPhone !== '' ? $emergencyContactPhone : null;
+        }
+        if ($hasColumn($pdo, 'tblusers', 'profile_picture')) {
+            $setParts[] = 'profile_picture = :profile_picture';
+            $params[':profile_picture'] = $profilePicture !== '' ? $profilePicture : null;
+        }
+        if ($hasColumn($pdo, 'tblusers', 'assigned_blood_bank')) {
+            $setParts[] = 'assigned_blood_bank = :assigned_blood_bank';
+            $params[':assigned_blood_bank'] = $assignedBloodBank !== '' ? $assignedBloodBank : null;
+        }
+        if ($hasColumn($pdo, 'tblusers', 'position')) {
+            $setParts[] = 'position = :position';
+            $params[':position'] = $position !== '' ? $position : null;
+        }
+        if ($hasColumn($pdo, 'tblusers', 'employee_id')) {
+            $setParts[] = 'employee_id = :employee_id';
+            $params[':employee_id'] = $employeeId !== '' ? $employeeId : null;
+        }
+        if ($changingPassword && $usersPasswordColumn) {
+            $setParts[] = $usersPasswordColumn . ' = :user_password';
+            $params[':user_password'] = password_hash($newPassword, PASSWORD_DEFAULT);
+        }
+
+        if (empty($setParts)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'No fields to update.']);
+            exit;
+        }
+
+        $updateSql = 'UPDATE tblusers SET ' . implode(', ', $setParts) . ' WHERE id = :user_id LIMIT 1';
+        $updateStmt = $pdo->prepare($updateSql);
+        $updateStmt->execute($params);
+
+        $selectColumns = ['id', 'name AS full_name', 'email'];
+        if ($hasColumn($pdo, 'tblusers', 'phone')) $selectColumns[] = 'phone';
+        if ($hasColumn($pdo, 'tblusers', 'date_of_birth')) $selectColumns[] = 'date_of_birth';
+        if ($hasColumn($pdo, 'tblusers', 'address')) $selectColumns[] = 'address';
+        if ($hasColumn($pdo, 'tblusers', 'city')) $selectColumns[] = 'city';
+        if ($hasColumn($pdo, 'tblusers', 'dzongkhag')) $selectColumns[] = 'dzongkhag';
+        if ($hasColumn($pdo, 'tblusers', 'emergency_contact_name')) $selectColumns[] = 'emergency_contact_name';
+        if ($hasColumn($pdo, 'tblusers', 'emergency_contact_phone')) $selectColumns[] = 'emergency_contact_phone';
+        if ($hasColumn($pdo, 'tblusers', 'profile_picture')) $selectColumns[] = 'profile_picture';
+        if ($hasColumn($pdo, 'tblusers', 'assigned_blood_bank')) $selectColumns[] = 'assigned_blood_bank';
+        if ($hasColumn($pdo, 'tblusers', 'position')) $selectColumns[] = 'position';
+        if ($hasColumn($pdo, 'tblusers', 'employee_id')) $selectColumns[] = 'employee_id';
+
+        $profileStmt = $pdo->prepare('SELECT ' . implode(', ', $selectColumns) . ' FROM tblusers WHERE id = ? LIMIT 1');
+        $profileStmt->execute([$userId]);
+        $updated = $profileStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Profile updated successfully.',
+            'data' => $updated,
+        ]);
+        exit;
+    }
+
     $pkColumn = $hasColumn($pdo, 'tbldonors', 'donor_id') ? 'donor_id' : 'id';
     $bloodColumn = $pickColumn($pdo, 'tbldonors', ['blood_group', 'blood_type']);
     $passwordColumn = $pickColumn($pdo, 'tbldonors', ['password']);
@@ -68,21 +235,6 @@ try {
     $donorStmt = $pdo->prepare('SELECT ' . $pkColumn . ' AS donor_key, email, ' . ($passwordColumn ? $passwordColumn : 'NULL') . ' AS donor_password FROM tbldonors WHERE ' . $pkColumn . ' = ? LIMIT 1');
     $donorStmt->execute([$donorId]);
     $donorRow = $donorStmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$donorRow && $tokenEmail !== '') {
-        $donorStmt = $pdo->prepare('SELECT ' . $pkColumn . ' AS donor_key, email, ' . ($passwordColumn ? $passwordColumn : 'NULL') . ' AS donor_password FROM tbldonors WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) LIMIT 1');
-        $donorStmt->execute([$tokenEmail]);
-        $donorRow = $donorStmt->fetch(PDO::FETCH_ASSOC);
-        if ($donorRow) {
-            $donorId = (int)$donorRow['donor_key'];
-        }
-    }
-
-    if (!$donorRow) {
-        http_response_code(404);
-        echo json_encode(['success' => false, 'message' => 'Donor profile not found.']);
-        exit;
-    }
 
     $fullName = trim((string)($payload['full_name'] ?? ''));
     $email = trim((string)($payload['email'] ?? ''));

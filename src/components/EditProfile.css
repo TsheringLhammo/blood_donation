@@ -18,7 +18,7 @@
     radial-gradient(circle at top right, rgba(176, 23, 45, 0.10), transparent 28%),
     linear-gradient(180deg, #fffdfb 0%, #fbf7f4 100%);
   border-radius: 20px;
-  max-width: 820px;
+  max-width: 760px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
@@ -34,7 +34,7 @@
   padding: 22px 28px;
   border-bottom: 1px solid rgba(176, 23, 45, 0.10);
   background:
-    linear-gradient(135deg, rgba(176, 23, 45, 0.08), rgba(255, 255, 255, 0.92));
+    linear-gradient(135deg, rgba(157, 26, 36, 0.12), rgba(255, 255, 255, 0.96));
   border-radius: 24px 24px 0 0;
 }
 
@@ -80,17 +80,37 @@
 }
 
 .edit-profile-form {
-  padding: 24px 28px 22px;
+  padding: 18px 22px 18px;
 }
 
 .form-row {
   display: flex;
-  gap: 18px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.compact-row .form-control {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.96rem;
+}
+
+.profile-section-title {
+  margin: 16px 0 10px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #7e101d;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.password-row {
+  margin-top: 4px;
 }
 
 .form-group {
   flex: 1;
+  min-width: 0;
 }
 
 .form-group label {
@@ -203,6 +223,132 @@
   margin: 24px -28px 0 -28px;
   padding: 18px 28px 26px 28px;
   border-radius: 0 0 20px 20px;
+}
+
+/* Avatar / layout to match donor profile structure */
+.edit-profile-grid {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.edit-profile-content {
+  display: grid;
+  gap: 18px;
+}
+
+.edit-profile-avatar-card {
+  background: linear-gradient(180deg, rgba(249,244,243,0.9), rgba(255,255,255,0.96));
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+  border: 1px solid rgba(176,23,45,0.06);
+}
+
+.edit-profile-avatar-ring {
+  width: 104px;
+  height: 104px;
+  margin: 0 auto 12px auto;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, rgba(241,236,235,1), rgba(255,255,255,0.9));
+  border: 6px dashed rgba(177,23,45,0.06);
+}
+
+.edit-profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
+}
+
+.edit-profile-avatar-placeholder {
+  font-size: 2.4rem;
+}
+
+.edit-profile-photo-button {
+  display: inline-block;
+  margin-top: 6px;
+  background: linear-gradient(135deg, #c7353c, #9e1a24);
+  color: #fff;
+  padding: 9px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.94rem;
+}
+
+.edit-profile-photo-input {
+  display: none;
+}
+
+.edit-profile-photo-hint {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #6b4b4b;
+  white-space: pre-line;
+}
+
+.edit-profile-inline-error {
+  margin-top: 8px;
+  color: #9f1f33;
+  font-weight: 600;
+}
+
+/* Full page shell (matches donor profile feel) */
+.edit-profile-page {
+  padding: 18px 26px;
+}
+
+.edit-profile-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, #fffdfb 0%, #fbf7f4 100%);
+  border-radius: 12px;
+  box-shadow: 0 18px 46px rgba(35,8,16,0.18);
+  overflow: hidden;
+}
+
+.edit-profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 22px;
+  background: linear-gradient(180deg, #b91e2b, #8a0f1a);
+  color: #fff;
+}
+
+.edit-profile-hero h1 { margin: 0; font-size: 1.5rem; }
+.edit-profile-hero p { margin: 0; opacity: 0.9; }
+.edit-profile-hero-icon { font-size: 1.6rem; }
+.edit-profile-hero-actions { margin-left: auto; }
+.edit-profile-back {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.edit-profile-form-full {
+  padding: 18px 22px 22px;
+}
+
+@media (max-width: 900px) {
+  .edit-profile-grid { grid-template-columns: 1fr; }
+  .edit-profile-page { padding: 18px; }
+  .edit-profile-shell { margin: 0 12px; }
+}
+
+@media (max-width: 768px) {
+  .edit-profile-modal { max-width: 100%; }
+  .edit-profile-grid { grid-template-columns: 1fr; }
+  .edit-profile-photo-button { width: 100%; }
 }
 
 .btn {

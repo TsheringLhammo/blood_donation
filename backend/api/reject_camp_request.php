@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/mailer.php';
 
 bts_require_auth(['admin']);
 
@@ -38,9 +39,8 @@ $campId = (int)$data['id'];
 try {
     // Update camp request status
     $stmt = $pdo->prepare("
-        UPDATE camp_requests 
-        SET status = 'rejected', 
-            updated_at = NOW() 
+        UPDATE tblblood_camps 
+        SET status = 'rejected'
         WHERE id = ? AND status = 'pending'
     ");
     $stmt->execute([$campId]);
@@ -52,10 +52,56 @@ try {
     
     // Get camp details for notification
     $stmt = $pdo->prepare("
-        SELECT * FROM camp_requests WHERE id = ?
+        SELECT * FROM tblblood_camps WHERE id = ?
     ");
     $stmt->execute([$campId]);
     $camp = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Send rejection email
+    $organizerName = trim((string)($camp['contact_person'] ?? ''));
+    $organizerEmail = trim((string)($camp['email'] ?? ''));
+    $organizationName = 'Blood Donation Management System';
+    
+    if ($organizerEmail !== '' && filter_var($organizerEmail, FILTER_VALIDATE_EMAIL)) {
+        $emailSubject = 'Blood Donation Camp Booking - Request Not Approved';
+        
+        $htmlBody = <<<EOT
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <p>Dear $organizerName,</p>
+    
+    <p>We regret to inform you that your blood donation camp booking request has been rejected.</p>
+    
+    <p>This may be due to scheduling conflicts, incomplete information, or other organizational reasons.</p>
+    
+    <p>You may submit another request with updated details in the future.</p>
+    
+    <p>Thank you for your interest in organizing a blood donation camp and supporting this important cause.</p>
+    
+    <p>Best regards,<br>
+    <strong>$organizationName</strong></p>
+</body>
+</html>
+EOT;
+        
+        $textBody = <<<EOT
+Dear $organizerName,
+
+We regret to inform you that your blood donation camp booking request has been rejected.
+
+This may be due to scheduling conflicts, incomplete information, or other organizational reasons.
+
+You may submit another request with updated details in the future.
+
+Thank you for your interest in organizing a blood donation camp and supporting this important cause.
+
+Best regards,
+$organizationName
+EOT;
+        
+        $mailMeta = [];
+        bts_send_email($organizerEmail, $emailSubject, $htmlBody, $textBody, $mailMeta);
+    }
     
     echo json_encode([
         'success' => true,

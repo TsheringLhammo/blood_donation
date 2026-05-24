@@ -23,6 +23,17 @@ require_once __DIR__ . '/../config/auth.php';
 
 bts_require_auth(['admin']);
 
+function appointment_table_exists(PDO $pdo, string $tableName): bool
+{
+    try {
+        $stmt = $pdo->prepare('SHOW TABLES LIKE ?');
+        $stmt->execute([$tableName]);
+        return (bool)$stmt->fetch(PDO::FETCH_NUM);
+    } catch (Throwable $exception) {
+        return false;
+    }
+}
+
 // Get JSON input
 $jsonInput = file_get_contents('php://input');
 $data = json_decode($jsonInput, true);
@@ -37,15 +48,23 @@ $appointmentId = (int)$data['id'];
 
 try {
     // Update appointment status
-    $stmt = $pdo->prepare("
-        UPDATE tblappointments 
-        SET status = 'confirmed', 
-            updated_at = NOW() 
-        WHERE id = ? AND status = 'pending'
-    ");
-    $stmt->execute([$appointmentId]);
-    
-    if ($stmt->rowCount() === 0) {
+    $updatedRows = 0;
+    foreach (['tblappointments', 'appointments'] as $tableName) {
+        if (!appointment_table_exists($pdo, $tableName)) {
+            continue;
+        }
+
+        $stmt = $pdo->prepare('
+            UPDATE `' . $tableName . '`
+            SET status = "confirmed",
+                updated_at = NOW()
+            WHERE id = ? AND status = "pending"
+        ');
+        $stmt->execute([$appointmentId]);
+        $updatedRows += $stmt->rowCount();
+    }
+
+    if ($updatedRows === 0) {
         echo json_encode(['success' => false, 'message' => 'Appointment not found or already processed.']);
         exit;
     }

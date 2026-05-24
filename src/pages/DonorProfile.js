@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { authFetch, getStoredUser, saveAuthSession } from '../utils/auth';
+import { maskCidNumber, titleCase } from '../utils/strings';
 import './DonorProfile.css';
 
 const bloodGroupOptions = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -55,6 +56,7 @@ export default function DonorProfile() {
       ...donor,
       blood_group: donor.blood_group || donor.blood_type || '',
       profile_picture: donor.profile_picture || '',
+      cid_number_masked: donor.cid_number_masked || maskCidNumber(donor.cid_number || ''),
     };
   }, []);
 
@@ -156,7 +158,7 @@ export default function DonorProfile() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          full_name: form.full_name,
+          full_name: titleCase(form.full_name),
           email: form.email,
           phone: form.phone,
           date_of_birth: form.date_of_birth,
@@ -270,6 +272,10 @@ export default function DonorProfile() {
               </div>
 
               <div className="donor-profile-field-row donor-profile-age-row">
+                <div className="donor-profile-field-group">
+                  <label>CID NUMBER</label>
+                  <input readOnly value={profile?.cid_number_masked || 'Not available'} className="donor-profile-input donor-profile-input-readonly" />
+                </div>
                 <div className="donor-profile-field-group">
                   <label>AGE</label>
                   <input readOnly value={age === '' ? '' : `${age} years (auto-calculated)`} className="donor-profile-input donor-profile-input-readonly" />

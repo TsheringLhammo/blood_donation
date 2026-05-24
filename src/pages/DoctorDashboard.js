@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./DoctorDashboard.css";
 import { authFetch, clearAuthSession, getStoredUser } from "../utils/auth";
+import { titleCase } from "../utils/strings";
 
 const INITIAL_FORM = {
   hospitalName: "JDWNRH",
@@ -90,11 +91,13 @@ export default function DoctorDashboard() {
   useEffect(() => {
     const parsed = getStoredUser();
     if (!parsed?.token) {
-      navigate("/login");
+      clearAuthSession();
+      navigate("/login", { replace: true });
       return;
     }
     if (parsed.role !== "doctor") {
-      navigate("/");
+      clearAuthSession();
+      navigate("/", { replace: true });
       return;
     }
     setUser(parsed);
@@ -196,14 +199,33 @@ export default function DoctorDashboard() {
     }
   }, [submitted]);
 
+  const openProfileEditor = useCallback(() => {
+    navigate('/doctor/profile');
+  }, [navigate]);
+
   const handleLogout = () => {
     clearAuthSession();
     navigate("/login");
   };
 
+  const autoCapitalizeName = (value) => {
+    if (!value) return value;
+    return value
+      .split(' ')
+      .map(word => word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word)
+      .join(' ');
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    let newValue = value;
+    
+    // Auto-capitalize for name fields
+    if ((name === "patientName" || name === "doctorName") && value) {
+      newValue = autoCapitalizeName(value);
+    }
+    
+    setForm((prev) => ({ ...prev, [name]: newValue }));
     setSubmitError("");
     setSubmitted(false);
   };
@@ -232,6 +254,8 @@ export default function DoctorDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          patientName: titleCase(form.patientName),
+          doctorName: titleCase(form.doctorName),
           diagnosis: form.diagnosis === "Other" ? (form.diagnosisOther || "").trim() : form.diagnosis,
           patientGender: form.patientGender || null,
           units: Number(form.units) || 1,
@@ -262,26 +286,57 @@ export default function DoctorDashboard() {
 
   if (!user) return null;
 
+  const initials = user?.name
+    ? user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : "?";
+  const docAvatarSrc = user?.profile_picture || getStoredUser()?.profile_picture || "";
+
   return (
     <div className="doctor-page">
       <header className="doctor-topbar">
         <div className="doctor-topbar-inner">
           <div className="doctor-brand">Hospital Blood Request Desk</div>
           <div className="doctor-user-actions">
-            <span>?? {user.name}</span>
+            <button className="doctor-user-pill" type="button" onClick={openProfileEditor} title="Edit profile">
+              <div className="avatar">
+                {docAvatarSrc ? <img src={docAvatarSrc} alt={user.name || 'Doctor'} /> : initials}
+              </div>
+              {user.name}
+            </button>
             <button onClick={handleLogout}>Logout</button>
           </div>
         </div>
       </header>
 
       <main className="doctor-main">
-        <section className="doctor-hero">
-          <h1>Doctor / Nurse Dashboard</h1>
-          <p>Submit official blood requests and track live processing status.</p>
-        </section>
+        <nav className="doctor-sidebar">
+          <div className="doctor-sidebar-header">Navigation</div>
+          <Link to="/blood-banks" className="doctor-nav-link">
+            <span className="doctor-nav-icon">🏥</span>
+            Blood Bank Directory
+          </Link>
+          <Link to="/staff" className="doctor-nav-link">
+            <span className="doctor-nav-icon">👥</span>
+            Staff Dashboard
+          </Link>
+          <Link to="/admin" className="doctor-nav-link">
+            <span className="doctor-nav-icon">⚙️</span>
+            Admin Dashboard
+          </Link>
+          <Link to="/" className="doctor-nav-link">
+            <span className="doctor-nav-icon">🏠</span>
+            Back to Home
+          </Link>
+        </nav>
 
-        <section className="doctor-layout">
-          <article className="doctor-card">
+        <section className="doctor-content">
+          <section className="doctor-hero">
+            <h1>Doctor / Nurse Dashboard</h1>
+            <p>Submit official blood requests and track live processing status.</p>
+          </section>
+
+          <section className="doctor-layout">
+            <article className="doctor-card">
             <div className="form-header">
               <div className="form-hospital-title">
                 <p>BHUTAN BLOOD TRANSFUSION SERVICES</p>
@@ -473,11 +528,6 @@ export default function DoctorDashboard() {
             </div>
           </article>
 
-          <section className="doctor-links">
-            <Link to="/blood-banks">Blood Bank Directory</Link>
-            <Link to="/staff">Staff Dashboard</Link>
-            <Link to="/admin">Admin Dashboard</Link>
-            <Link to="/">Back to Home</Link>
           </section>
         </section>
       </main>

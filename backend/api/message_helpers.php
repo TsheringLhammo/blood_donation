@@ -42,6 +42,20 @@ if (!function_exists('get_message_log')) {
     }
 }
 
+if (!function_exists('notification_table_exists')) {
+    function notification_table_exists(PDO $pdo): bool
+    {
+        static $exists;
+        if ($exists !== null) {
+            return $exists;
+        }
+
+        $stmt = $pdo->query("SHOW TABLES LIKE 'tblnotifications'");
+        $exists = (bool)$stmt->fetchColumn();
+        return $exists;
+    }
+}
+
 if (!function_exists('insert_message_log')) {
     function insert_message_log(PDO $pdo, array $data): int
     {
@@ -156,11 +170,46 @@ if (!function_exists('send_donor_test_result_notification')) {
 
         update_message_log($pdo, $logId, $updateData);
 
+        $notificationInserted = false;
+        if (in_array($channel, ['both', 'in_app'], true) && notification_table_exists($pdo)) {
+            try {
+                $columns = array_map(function ($row) {
+                    return $row[0];
+                }, $pdo->query("SHOW COLUMNS FROM tblnotifications")->fetchAll(PDO::FETCH_NUM));
+
+                $insertColumns = ['user_id', 'role_target', 'title', 'message', 'severity', 'channel', 'is_read', 'created_at'];
+                $placeholders = array_fill(0, count($insertColumns), '?');
+                $params = [$donorId, 'donor', $subject, $messageContent, $sent ? 'success' : 'warning', 'in_app', 0, date('Y-m-d H:i:s')];
+
+                if (in_array('type', $columns, true)) {
+                    $insertColumns[] = 'type';
+                    $placeholders[] = '?';
+                    $params[] = 'donor';
+                }
+
+                $sql = 'INSERT INTO tblnotifications (' . implode(', ', $insertColumns) . ') VALUES (' . implode(', ', $placeholders) . ')';
+                $notifyStmt = $pdo->prepare($sql);
+                $notificationInserted = $notifyStmt->execute($params);
+
+                if ($notificationInserted && !$sent) {
+                    $sent = true;
+                    $status = 'sent';
+                    $updateData['status'] = $status;
+                    $updateData['sent_date'] = date('Y-m-d H:i:s');
+                    $updateData['error_message'] = null;
+                    update_message_log($pdo, $logId, $updateData);
+                }
+            } catch (Throwable $e) {
+                // Ignore if the notification table is not compatible or insert fails.
+            }
+        }
+
         return [
             'success' => $sent,
             'skipped' => false,
             'log_id' => $logId,
             'status' => $status,
+            'notification_inserted' => $notificationInserted,
             'errors' => $errors,
         ];
     }

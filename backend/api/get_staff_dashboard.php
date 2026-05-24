@@ -290,14 +290,24 @@ try {
     $lowStockItemsStmt->execute([$lowStockThreshold]);
     $lowStockItems = $lowStockItemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Only include notifications targeted to staff or specifically to this user.
     $notifications = $safeQuery($pdo, 'tblnotifications',
         'SELECT id, title, message, severity, is_read,
                 DATE_FORMAT(created_at, "%Y-%m-%d %H:%i") AS created_at
          FROM tblnotifications
-         WHERE role_target IN ("staff", "admin") OR user_id = ' . (int)$userId . '
+         WHERE role_target = "staff" OR user_id = ' . (int)$userId . '
          ORDER BY id DESC
          LIMIT 15'
     );
+
+    $unreadCountStmt = $pdo->prepare(
+        'SELECT COUNT(*) AS unread_count
+         FROM tblnotifications
+         WHERE is_read = 0
+           AND (role_target = "staff" OR user_id = ? )'
+    );
+    $unreadCountStmt->execute([$userId]);
+    $notificationsUnreadCount = (int)$unreadCountStmt->fetchColumn();
 
     $incoming = (int)$pdo->query("SELECT COUNT(*) FROM tblblood_requests WHERE status IN ('Pending', 'Approved', 'Cross-Matching', 'Matched')")->fetchColumn();
     $queue = (int)$pdo->query("SELECT COUNT(*) FROM tblblood_requests WHERE status = 'Cross-Matching'")->fetchColumn();
@@ -381,6 +391,7 @@ try {
         'expiryAlerts' => $expiryAlerts,
         'expiryAlertWindowDays' => $expiryAlertWindowDays,
         'notifications' => $notifications,
+        'notificationsUnreadCount' => $notificationsUnreadCount,
     ]);
 } catch (Throwable $exception) {
     http_response_code(500);

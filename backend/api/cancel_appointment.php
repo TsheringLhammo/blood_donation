@@ -41,6 +41,17 @@ if (!is_array($data)) {
 $appointmentId = (int)($data['appointmentId'] ?? 0);
 $cancellationReason = trim((string)($data['reason'] ?? ''));
 
+function appointment_table_exists(PDO $pdo, string $tableName): bool
+{
+    try {
+        $stmt = $pdo->prepare('SHOW TABLES LIKE ?');
+        $stmt->execute([$tableName]);
+        return (bool)$stmt->fetch(PDO::FETCH_NUM);
+    } catch (Throwable $exception) {
+        return false;
+    }
+}
+
 if ($appointmentId <= 0) {
     http_response_code(422);
     echo json_encode(['success' => false, 'message' => 'Appointment ID is required.']);
@@ -79,8 +90,22 @@ try {
     }
 
     // Update status to cancelled
-    $updateStmt = $pdo->prepare('UPDATE tblappointments SET status = "cancelled" WHERE id = ?');
-    $updateStmt->execute([$appointmentId]);
+    $updatedRows = 0;
+    foreach (['tblappointments', 'appointments'] as $tableName) {
+        if (!appointment_table_exists($pdo, $tableName)) {
+            continue;
+        }
+
+        $updateStmt = $pdo->prepare('UPDATE `' . $tableName . '` SET status = "cancelled" WHERE id = ?');
+        $updateStmt->execute([$appointmentId]);
+        $updatedRows += $updateStmt->rowCount();
+    }
+
+    if ($updatedRows === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Appointment not found.']);
+        exit;
+    }
 
     echo json_encode([
         'success' => true,

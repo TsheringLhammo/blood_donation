@@ -1,18 +1,25 @@
 .admin-shell {
+  --admin-header-height: 88px;
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px 1fr;
-  background: var(--bg);
+  grid-template-rows: var(--admin-header-height) 1fr;
+  grid-template-areas:
+    "header header"
+    "sidebar main";
+  background: #f6f1ec;
 }
 
 .admin-shell-sidebar {
-  background: #51000e;
-  color: #fff;
-  padding: 20px 14px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  grid-area: sidebar;
   position: sticky;
   top: 0;
   height: 100vh;
+  padding: 20px 14px;
+  color: #fff;
+  background: linear-gradient(180deg, #690012 0%, #4f000d 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 12px 0 30px rgba(62, 9, 18, 0.12);
   z-index: 120;
 }
 
@@ -22,8 +29,8 @@
   text-transform: uppercase;
   font-size: 13px;
   padding: 10px 10px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
   margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .admin-shell-nav {
@@ -34,79 +41,157 @@
 .admin-shell-nav-item {
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(255, 255, 255, 0.9);
-  border-radius: 10px;
-  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: 12px;
+  padding: 12px 12px;
   text-align: left;
   display: flex;
   gap: 10px;
   align-items: center;
   cursor: pointer;
   font-weight: 600;
+  transition: background 0.18s ease, transform 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.admin-shell-nav-text {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .admin-shell-nav-item:hover {
   background: rgba(255, 255, 255, 0.12);
+  transform: translateX(2px);
 }
 
 .admin-shell-nav-item.active {
   background: #fff;
-  color: #51000e;
+  color: #690012;
+  box-shadow: 0 10px 24px rgba(37, 0, 8, 0.16);
 }
 
 .admin-shell-main {
+  grid-area: main;
   min-width: 0;
+  background: #f6f1ec;
 }
 
 .admin-shell-header {
+  grid-area: header;
   position: sticky;
   top: 0;
-  z-index: 110;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 12px 18px;
+  z-index: 130;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 14px 20px 14px 18px;
+  color: #fff;
+  background: linear-gradient(90deg, #690012 0%, #8f0018 58%, #b7001f 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 24px rgba(73, 0, 11, 0.18);
+}
+
+.admin-shell-brand-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-right: 12px;
+}
+
+.admin-shell-brand-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.admin-shell-brand-subtitle {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 231, 234, 0.82);
+  white-space: nowrap;
+}
+
+.admin-shell-header > div:first-of-type {
+  min-width: 0;
 }
 
 .admin-shell-header h1 {
-  font-size: 18px;
   margin: 0;
+  font-size: 18px;
+  line-height: 1.15;
+  color: #fff;
 }
 
 .admin-shell-header p {
   margin: 2px 0 0;
-  color: var(--muted);
+  color: rgba(255, 231, 234, 0.88);
   font-size: 13px;
 }
 
 .admin-shell-content {
-  max-width: 1200px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 34px;
 }
 
 .admin-shell-user-actions {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .admin-shell-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border-radius: 999px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  color: #fff;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 600;
 }
 
+.admin-shell-profile-button {
+  cursor: pointer;
+}
+
+.admin-shell-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  color: #7a0016;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.admin-shell-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .admin-shell-logout {
   border: 1px solid rgba(139, 0, 18, 0.12);
   background: linear-gradient(180deg, #fff, #fdf7f3);
-  color: var(--red-dark);
+  color: #690012;
   border-radius: 999px;
   padding: 9px 16px;
   cursor: pointer;
@@ -121,34 +206,29 @@
   background: linear-gradient(180deg, #fff, #fff5f5);
 }
 
-.admin-shell-menu {
-  display: none;
-  border: 1px solid var(--border);
-  background: #fff;
-  border-radius: 8px;
-  width: 38px;
-  height: 38px;
-  cursor: pointer;
-}
-
 .admin-shell-backdrop {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(15, 23, 42, 0.38);
 }
 
 @media (max-width: 900px) {
   .admin-shell {
     grid-template-columns: 1fr;
+    grid-template-rows: var(--admin-header-height) 1fr;
+    grid-template-areas:
+      "header"
+      "main";
   }
 
   .admin-shell-sidebar {
     position: fixed;
     left: -300px;
-    transition: left 0.22s ease;
+    top: var(--admin-header-height);
     width: 260px;
-    height: 100%;
+    height: calc(100vh - var(--admin-header-height));
+    transition: left 0.22s ease;
   }
 
   .admin-shell-sidebar.open {
@@ -159,9 +239,37 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex: 0 0 auto;
   }
 
   .admin-shell-content {
     padding: 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-shell-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .admin-shell-brand-block {
+    flex: 1 1 100%;
+    padding-right: 0;
+  }
+
+  .admin-shell-header > div:first-of-type {
+    flex: 1 1 100%;
+  }
+
+  .admin-shell-user-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .admin-shell-content {
+    padding: 14px;
   }
 }

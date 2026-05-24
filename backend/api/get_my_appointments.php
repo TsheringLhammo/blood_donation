@@ -63,6 +63,41 @@ try {
 
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // If we have a donation_history table, prefer the latest donation_history.status
+    // for appointments whose row status is empty/stale (pending/confirmed/blank).
+    $tablesRes = $pdo->query("SHOW TABLES LIKE 'donation_history'");
+    if ($rows && $tablesRes && $tablesRes->rowCount() > 0) {
+        $appointmentIds = array_values(array_filter(array_map(function($r) { return isset($r['id']) ? (int)$r['id'] : 0; }, $rows)));
+        if ($appointmentIds) {
+            $placeholders = implode(',', array_fill(0, count($appointmentIds), '?'));
+            $historySql = "SELECT dh.appointment_id, dh.status
+                           FROM donation_history dh
+                           INNER JOIN (
+                               SELECT appointment_id, MAX(id) AS max_id
+                               FROM donation_history
+                               WHERE appointment_id IN ({$placeholders})
+                               GROUP BY appointment_id
+                           ) latest ON latest.appointment_id = dh.appointment_id AND latest.max_id = dh.id";
+            $historyStmt = $pdo->prepare($historySql);
+            $historyStmt->execute($appointmentIds);
+            $historyStatusByAppointment = [];
+            foreach ($historyStmt->fetchAll(PDO::FETCH_ASSOC) as $hrow) {
+                $historyStatusByAppointment[(int)($hrow['appointment_id'] ?? 0)] = (string)($hrow['status'] ?? '');
+            }
+
+            foreach ($rows as &$row) {
+                $appointmentId = (int)($row['id'] ?? 0);
+                $rawStatus = strtolower(trim((string)($row['status'] ?? '')));
+                $historyStatus = strtolower(trim((string)($historyStatusByAppointment[$appointmentId] ?? '')));
+
+                if (in_array($rawStatus, ['', 'pending', 'confirmed'], true) && $historyStatus !== '') {
+                    $row['status'] = $historyStatus;
+                }
+            }
+            unset($row);
+        }
+    }
+
     echo json_encode(['success' => true, 'count' => count($rows), 'data' => $rows]);
 
 } catch (Exception $e) {

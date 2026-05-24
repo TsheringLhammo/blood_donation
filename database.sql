@@ -9,6 +9,7 @@ CREATE TABLE tbldonors (
   full_name VARCHAR(200) NOT NULL,
   email VARCHAR(200) NOT NULL UNIQUE,
   phone VARCHAR(50) NOT NULL,
+  cid_number VARCHAR(11) UNIQUE DEFAULT NULL,
   blood_type VARCHAR(10) NOT NULL,
   test_result VARCHAR(30) NOT NULL DEFAULT 'pending',
   workflow_status VARCHAR(40) NOT NULL DEFAULT 'awaiting_review',

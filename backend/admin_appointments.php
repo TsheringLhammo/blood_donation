@@ -46,7 +46,7 @@ try {
             throw new RuntimeException('Invalid action.');
         }
 
-        $newStatus = $action === 'confirm' ? 'Confirmed' : 'Rejected';
+        $newStatus = $action === 'confirm' ? 'confirmed' : 'rejected';
 
         $pdo->beginTransaction();
 

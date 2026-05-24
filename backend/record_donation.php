@@ -48,6 +48,119 @@ function component_inventory_column(PDO $pdo, string $component): string
     return 'whole_units';
 }
 
+function table_exists(PDO $pdo, string $table): bool
+{
+  try {
+    $stmt = $pdo->prepare('SHOW TABLES LIKE ?');
+    $stmt->execute([$table]);
+    return (bool)$stmt->fetch(PDO::FETCH_NUM);
+  } catch (Throwable $exception) {
+    return false;
+  }
+}
+
+function ensure_donation_history_table(PDO $pdo): void
+{
+  if (table_exists($pdo, 'donation_history')) {
+    return;
+  }
+
+  $pdo->exec(
+    "CREATE TABLE IF NOT EXISTS donation_history (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      appointment_id INT UNSIGNED NULL,
+      donation_id VARCHAR(40) NULL,
+      donor_id INT UNSIGNED NULL,
+      donor_name VARCHAR(160) NULL,
+      blood_bank_id INT UNSIGNED NOT NULL,
+      blood_type VARCHAR(5) NOT NULL,
+      component ENUM('Whole Blood','Packed Red Cells','Plasma','Platelets') NOT NULL DEFAULT 'Whole Blood',
+      units_collected SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+      donation_date DATETIME NOT NULL,
+      status VARCHAR(30) NOT NULL DEFAULT 'Completed',
+      notes VARCHAR(255) NULL,
+      completed_by_user_id INT UNSIGNED NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_donation_history_donor (donor_id),
+      INDEX idx_donation_history_appointment (appointment_id),
+      INDEX idx_donation_history_status (status),
+      INDEX idx_donation_history_date (donation_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+  );
+}
+
+function insert_donation_history(PDO $pdo, array $appointment, string $donationId, int $bloodBankId, string $bloodType, string $component, int $unitsCollected, int $actorUserId): void
+{
+  try {
+    ensure_donation_history_table($pdo);
+  } catch (Throwable $exception) {
+    return;
+  }
+
+  if (!table_exists($pdo, 'donation_history')) {
+    return;
+  }
+
+  $createdAt = date('Y-m-d H:i:s');
+  $donationDate = date('Y-m-d H:i:s');
+  $donorName = trim((string)($appointment['donor_name'] ?? $appointment['full_name'] ?? ''));
+
+  $payload = [
+    'appointment_id' => (int)($appointment['id'] ?? 0),
+    'donation_id' => $donationId,
+    'donor_id' => (int)($appointment['donor_id'] ?? 0),
+    'donor_name' => $donorName !== '' ? $donorName : null,
+    'blood_bank_id' => $bloodBankId,
+    'blood_type' => $bloodType,
+    'component' => $component,
+    'units_collected' => $unitsCollected,
+    'donation_date' => $donationDate,
+    'status' => 'Completed',
+    'notes' => 'Completed appointment donation recorded from staff workflow.',
+    'completed_by_user_id' => $actorUserId > 0 ? $actorUserId : null,
+    'created_at' => $createdAt,
+    'updated_at' => $createdAt,
+  ];
+
+  $columns = [];
+  $values = [];
+
+  foreach ($payload as $column => $value) {
+    if (!has_column($pdo, 'donation_history', $column)) {
+      continue;
+    }
+
+    $columns[] = $column;
+    $values[] = $value;
+  }
+
+  if (empty($columns)) {
+    return;
+  }
+
+  $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+  $stmt = $pdo->prepare('INSERT INTO donation_history (' . implode(', ', $columns) . ') VALUES (' . $placeholders . ')');
+  $stmt->execute($values);
+}
+
+function mark_appointment_completed(PDO $pdo, string $tableName, int $appointmentId): void
+{
+  if (!table_exists($pdo, $tableName)) {
+    return;
+  }
+
+  $hasUpdatedAt = has_column($pdo, $tableName, 'updated_at');
+  $sql = 'UPDATE `' . str_replace('`', '``', $tableName) . '` SET status = "completed"';
+  if ($hasUpdatedAt) {
+    $sql .= ', updated_at = NOW()';
+  }
+  $sql .= ' WHERE id = ?';
+
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute([$appointmentId]);
+}
+
 function next_donation_id(PDO $pdo): string
 {
     $year = date('Y');
@@ -77,7 +190,7 @@ try {
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $component = trim((string)($_POST['component'] ?? ''));
-        $allowedComponents = ['Whole Blood', 'PRBC', 'Platelets', 'FFP'];
+        $allowedComponents = ['Whole Blood', 'PRBC', 'Platelets'];
         if (!in_array($component, $allowedComponents, true)) {
             throw new RuntimeException('Invalid component selected.');
         }
@@ -141,8 +254,19 @@ try {
         );
         $updateInventory->execute([$bloodBankId, $bloodType]);
 
-        $updateAppointment = $pdo->prepare('UPDATE appointments SET status = "Completed" WHERE id = ?');
-        $updateAppointment->execute([$appointmentId]);
+        mark_appointment_completed($pdo, 'tblappointments', $appointmentId);
+        mark_appointment_completed($pdo, 'appointments', $appointmentId);
+
+        insert_donation_history(
+          $pdo,
+          $appointment,
+          $donationId,
+          $bloodBankId,
+          $bloodType,
+          $component,
+          1,
+          (int)($_SESSION['user_id'] ?? $_SESSION['id'] ?? 0)
+        );
 
         if (has_column($pdo, 'tbldonors', 'last_donation_date')) {
             $donorUpdate = $pdo->prepare('UPDATE tbldonors SET last_donation_date = CURDATE() WHERE id = ?');
@@ -258,7 +382,6 @@ try {
           <option value="Whole Blood">Whole Blood</option>
           <option value="PRBC">PRBC</option>
           <option value="Platelets">Platelets</option>
-          <option value="FFP">FFP</option>
         </select>
       </div>
       <button class="btn success" type="submit">Save Donation</button>

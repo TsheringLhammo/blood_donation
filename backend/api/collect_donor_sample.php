@@ -36,6 +36,17 @@ $DB_USER = 'root';
 $DB_PASS = '';
 $DB_NAME = 'blood_donation';
 
+if (file_exists(__DIR__ . '/../config/mailer.php')) {
+    require_once __DIR__ . '/../config/mailer.php';
+}
+
+if (!function_exists('bts_send_email')) {
+    function bts_send_email(...$args): bool
+    {
+        return false;
+    }
+}
+
 // Connect to database
 $mysqli = new mysqli($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
 
@@ -185,7 +196,7 @@ if ($collectionTime !== '' && !preg_match('/^\d{2}:\d{2}$/', $collectionTime)) {
 
 try {
     // Step 1: Check if donor exists
-    $checkDonorQuery = "SELECT id, full_name, blood_type, status FROM tbldonors WHERE id = ?";
+    $checkDonorQuery = "SELECT id, full_name, email, blood_type, status FROM tbldonors WHERE id = ?";
     $stmt = $mysqli->prepare($checkDonorQuery);
     $stmt->bind_param("i", $donorId);
     $stmt->execute();
@@ -261,15 +272,23 @@ try {
     }
 
     $notificationTitle = 'SAMPLE COLLECTION APPOINTMENT CONFIRMED';
-    $notificationMessage = "Dear {$donor['full_name']},\n\n"
-        . "Your SAMPLE COLLECTION appointment has been confirmed.\n\n"
-        . "This is a SMALL blood sample (about 5ml) for testing.\n"
-        . "We will test for HIV, Hepatitis, Malaria, etc.\n\n"
+    $notificationMessage = "SAMPLE COLLECTION APPOINTMENT CONFIRMED\n\n"
+        . "Dear {$donor['full_name']},\n\n"
+        . "Your sample collection appointment has been confirmed.\n\n"
+        . "This is a small blood sample (about 5ml) for testing.\n"
+        . "We will test for:\n\n"
+        . "HIV\n\n"
+        . "Hepatitis B & C\n\n"
+        . "Syphilis\n\n"
+        . "Malaria\n\n"
+        . "...and many more.\n\n"
         . "Blood Bank: National Blood Bank, Thimphu\n"
         . "Date: {$formattedDate}\n"
         . "Time: {$displayTime}\n\n"
-        . "Results will be ready in 2-3 days.\n"
-        . "You will be notified when results are available.";
+        . "Please eat a light meal before coming. If you cannot attend, please inform us at least 24 hours in advance.\n\n"
+        . "Thank you for your cooperation.\n\n"
+        . "Regards,\n"
+        . "Blood Transfusion Services";
 
     insert_donor_notification(
         $mysqli,
@@ -278,6 +297,14 @@ try {
         $notificationMessage,
         $createdAt
     );
+
+    $donorEmail = trim((string)($donor['email'] ?? ''));
+    if ($donorEmail !== '' && filter_var($donorEmail, FILTER_VALIDATE_EMAIL)) {
+        $emailSubject = 'SAMPLE COLLECTION APPOINTMENT CONFIRMED';
+        $emailText = $notificationMessage;
+        $emailHtml = nl2br(htmlspecialchars($notificationMessage, ENT_QUOTES, 'UTF-8'));
+        bts_send_email($donorEmail, $emailSubject, $emailHtml, $emailText);
+    }
 
     // Step 5: Return success response
     echo json_encode([

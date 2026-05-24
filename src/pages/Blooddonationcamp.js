@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Blooddonationcamp.css";
+import { titleCase } from "../utils/strings";
 
 const CAMP_API_URL = process.env.REACT_APP_CAMP_API_URL;
 
@@ -105,9 +106,24 @@ export default function BloodDonationCamp() {
     return newErrors;
   };
 
+  const autoCapitalizeName = (value) => {
+    if (!value) return value;
+    return value
+      .split(' ')
+      .map(word => word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word)
+      .join(' ');
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    let newValue = value;
+    
+    // Auto-capitalize for name fields
+    if ((name === "contactPerson" || name === "organizationName") && value && type !== "checkbox") {
+      newValue = autoCapitalizeName(value);
+    }
+    
+    setFormData((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : newValue }));
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -123,8 +139,8 @@ export default function BloodDonationCamp() {
     }
 
     const payload = {
-      organizationName: formData.organizationName,
-      contactPerson: formData.contactPerson,
+      organizationName: titleCase(formData.organizationName),
+      contactPerson: titleCase(formData.contactPerson),
       phone: formData.phone,
       email: formData.email || null,
       dzongkhag: formData.dzongkhag,

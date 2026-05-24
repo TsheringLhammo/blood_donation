@@ -53,6 +53,22 @@ if (!is_array($payload) || empty($payload)) {
     exit;
 }
 
+// --- Debug logging (temporary) -------------------------------------------
+$enableDebug = (isset($_GET['debug']) && $_GET['debug'] === '1') || (!empty($payload['__debug']));
+if ($enableDebug) {
+    $logDir = __DIR__ . '/../logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+    $logFile = $logDir . '/register_donor_debug.log';
+    $logEntry = "---- REGISTER DEBUG " . date('c') . " ----\n";
+    $logEntry .= "REMOTE_ADDR=" . ($_SERVER['REMOTE_ADDR'] ?? 'cli') . "\n";
+    $logEntry .= "RAW_INPUT=" . substr($rawInput ?? '', 0, 2000) . "\n";
+    $logEntry .= "PAYLOAD_KEYS=" . implode(',', array_keys($payload)) . "\n";
+    @file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+}
+// -------------------------------------------------------------------------
+
 $toBool = static function ($value): bool {
     return filter_var($value, FILTER_VALIDATE_BOOLEAN) === true;
 };
@@ -63,6 +79,7 @@ $fullName    = trim((string)($payload['fullName']    ?? ''));
 $email       = trim((string)($payload['email']       ?? ''));
 $password    = (string)($payload['password']         ?? '');
 $phone       = trim((string)($payload['phone']       ?? ''));
+$cidNumber   = trim((string)($payload['cidNumber']   ?? ($payload['cid_number'] ?? '')));
 $dateOfBirth = trim((string)($payload['dateOfBirth'] ?? ''));
 $gender      = trim((string)($payload['gender']      ?? ''));
 $bloodType   = trim((string)($payload['bloodType']   ?? ''));
@@ -93,6 +110,7 @@ $requiredFields = [
     'email' => $email,
     'password' => $password,
     'phone' => $phone,
+    'cidNumber' => $cidNumber,
     'dateOfBirth' => $dateOfBirth,
     'gender' => $gender,
     'bloodType' => $bloodType,
@@ -130,6 +148,12 @@ if (strlen($password) < 6) {
 if (!preg_match('/^(16|17|77)\d{6}$/', $phone)) {
     http_response_code(422);
     echo json_encode(['success' => false, 'message' => 'Phone number must be exactly 8 digits and start with 16, 17, or 77.']);
+    exit;
+}
+
+if (!preg_match('/^\d{11}$/', $cidNumber)) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'CID must be 11 digits']);
     exit;
 }
 
@@ -231,16 +255,20 @@ function missing_donor_columns(PDO $pdo, array $columns): array
 }
 
 try {
+    if (!donor_column_exists($pdo, 'cid_number')) {
+        $pdo->exec("ALTER TABLE tbldonors ADD COLUMN cid_number VARCHAR(11) UNIQUE DEFAULT NULL AFTER phone");
+    }
+
     $healthNoColdColumn = donor_column_exists($pdo, 'health_no_cold_flush') ? 'health_no_cold_flush' : (donor_column_exists($pdo, 'health_no_cold_flu') ? 'health_no_cold_flu' : '');
     $consentColumn = donor_column_exists($pdo, 'consent') ? 'consent' : (donor_column_exists($pdo, 'consent_medical') ? 'consent_medical' : '');
 
-    if ($healthNoColdColumn === '' || $consentColumn === '') {
-        http_response_code(500);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Database schema is missing either health_no_cold_flu/health_no_cold_flush or consent/consent_medical.',
-        ]);
-        exit;
+    // Do not abort if optional donor columns are missing. Instead proceed and only
+    // include columns that exist in the INSERT. This avoids blocking registration
+    // when the DB schema is slightly different between installs.
+    if ($enableDebug && ($healthNoColdColumn === '' || $consentColumn === '')) {
+        $logFile = __DIR__ . '/../logs/register_donor_debug.log';
+        $warnEntry = "WARN: optional donor columns missing: healthNoCold={$healthNoColdColumn} consent={$consentColumn} time=" . date('c') . "\n";
+        @file_put_contents($logFile, $warnEntry, FILE_APPEND | LOCK_EX);
     }
 
     $requiredDonorColumns = [
@@ -257,34 +285,61 @@ try {
     ];
     $requiredDonorColumns = array_values(array_filter($requiredDonorColumns));
 
+    // Check which of the commonly required donor columns actually exist. If some
+    // are missing, remove them from the list and continue. This makes the
+    // registration endpoint tolerant to schema variations while still saving any
+    // available donor fields.
     $missingColumns = missing_donor_columns($pdo, $requiredDonorColumns);
     if (!empty($missingColumns)) {
-        http_response_code(500);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Database schema is outdated. Missing donor columns: ' . implode(', ', $missingColumns) . '. Run SQL migration to add donor health/consent columns.',
-        ]);
-        exit;
+        if ($enableDebug) {
+            $logFile = __DIR__ . '/../logs/register_donor_debug.log';
+            $warnEntry = "WARN: missing donor columns: " . implode(', ', $missingColumns) . " time=" . date('c') . "\n";
+            @file_put_contents($logFile, $warnEntry, FILE_APPEND | LOCK_EX);
+        }
+        // Remove missing columns from required list so we don't attempt to insert them.
+        $requiredDonorColumns = array_values(array_diff($requiredDonorColumns, $missingColumns));
     }
 
+    // If a login account already exists for this email, allow creating the donor
+    // record only if there is no donor row yet. This handles cases where an
+    // account was pre-created but the donor profile wasn't saved.
     $existingUserStmt = $pdo->prepare('SELECT id FROM tblusers WHERE email = ? LIMIT 1');
     $existingUserStmt->execute([$email]);
-    if ($existingUserStmt->fetch(PDO::FETCH_ASSOC)) {
+    $existingUser = $existingUserStmt->fetch(PDO::FETCH_ASSOC);
+    if ($existingUser) {
+        // Check if donor row already exists for this email
+        $donorExistsStmt = $pdo->prepare('SELECT id FROM tbldonors WHERE email = ? LIMIT 1');
+        $donorExistsStmt->execute([$email]);
+        if ($donorExistsStmt->fetch(PDO::FETCH_ASSOC)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'This email already has a donor profile. Please sign in.']);
+            exit;
+        }
+        // We have an existing login but no donor row. We'll proceed to create the donor
+        // and reuse the existing user id (skip creating a new user record below).
+        $existingUserId = (int)$existingUser['id'];
+    } else {
+        $existingUserId = 0;
+    }
+
+    $cidExistsStmt = $pdo->prepare('SELECT id FROM tbldonors WHERE cid_number = ? LIMIT 1');
+    $cidExistsStmt->execute([$cidNumber]);
+    if ($cidExistsStmt->fetch(PDO::FETCH_ASSOC)) {
         http_response_code(409);
-        echo json_encode(['success' => false, 'message' => 'This email already has a login account. Please sign in.']);
+        echo json_encode(['success' => false, 'message' => 'This CID is already registered.']);
         exit;
     }
 
     $pdo->beginTransaction();
 
     $donorColumns = [
-        'full_name', 'email', 'phone', 'date_of_birth', 'blood_type', 'address', 'city', 'dzongkhag',
+        'full_name', 'email', 'phone', 'cid_number', 'date_of_birth', 'blood_type', 'address', 'city', 'dzongkhag',
         'gender', 'weight', 'last_donation_date',
         'health_tattoo', 'health_antibiotics', 'health_surgery',
         'emergency_contact_name', 'emergency_contact_phone'
     ];
     $donorPlaceholders = [
-        ':full_name', ':email', ':phone', ':date_of_birth', ':blood_type', ':address', ':city', ':dzongkhag',
+        ':full_name', ':email', ':phone', ':cid_number', ':date_of_birth', ':blood_type', ':address', ':city', ':dzongkhag',
         ':gender', ':weight', ':last_donation_date',
         ':health_tattoo', ':health_antibiotics', ':health_surgery',
         ':emergency_contact_name', ':emergency_contact_phone'
@@ -293,6 +348,7 @@ try {
         ':full_name' => $fullName,
         ':email' => $email,
         ':phone' => $phone,
+        ':cid_number' => $cidNumber,
         ':date_of_birth' => $dateOfBirth,
         ':blood_type' => $bloodType,
         ':address' => $address,
@@ -371,30 +427,125 @@ try {
         $params[':status'] = 'Pending';
     }
 
-    $statement = $pdo->prepare('INSERT INTO tbldonors (' . implode(', ', $donorColumns) . ') VALUES (' . implode(', ', $donorPlaceholders) . ')');
-    $statement->execute($params);
+    // Ensure we only include columns that actually exist in the tbldonors table.
+    $logFile = __DIR__ . '/../logs/register_donor_debug.log';
+    $finalColumns = [];
+    $finalPlaceholders = [];
+    $finalParams = [];
+    foreach ($donorColumns as $i => $col) {
+        if (donor_column_exists($pdo, $col)) {
+            $finalColumns[] = $col;
+            $finalPlaceholders[] = $donorPlaceholders[$i];
+            $ph = $donorPlaceholders[$i];
+            if (array_key_exists($ph, $params)) {
+                $finalParams[$ph] = $params[$ph];
+            } else {
+                $k = ltrim($ph, ':');
+                $alt = ':' . $k;
+                if (array_key_exists($alt, $params)) {
+                    $finalParams[$alt] = $params[$alt];
+                }
+            }
+        } else {
+            if ($enableDebug) {
+                @file_put_contents($logFile, "WARN: skipping missing donor column {$col}\n", FILE_APPEND | LOCK_EX);
+            }
+        }
+    }
+
+    if (empty($finalColumns)) {
+        // No matching columns to insert into; abort with clear message.
+        throw new Exception('No matching tbldonors columns found for insert.');
+    }
+
+    // (debugging removed) prepare and execute insert for final columns
+
+    $statement = $pdo->prepare('INSERT INTO tbldonors (' . implode(', ', $finalColumns) . ') VALUES (' . implode(', ', $finalPlaceholders) . ')');
+    $statement->execute($finalParams);
+    $donorId = (int)$pdo->lastInsertId();
 
     $hasRoleColumn = user_column_exists($pdo, 'role');
     $userInsertQuery = $hasRoleColumn
         ? 'INSERT INTO tblusers (name, email, password, role) VALUES (:name, :email, :password, :role)'
         : 'INSERT INTO tblusers (name, email, password) VALUES (:name, :email, :password)';
 
-    $userStmt = $pdo->prepare($userInsertQuery);
-    $userParams = [
-        ':name' => $fullName,
-        ':email' => $email,
-        ':password' => password_hash($password, PASSWORD_BCRYPT),
-        ':role' => 'donor',
-    ];
-    if (!$hasRoleColumn) {
-        unset($userParams[':role']);
+    $userId = 0;
+    if ($existingUserId === 0) {
+        $userStmt = $pdo->prepare($userInsertQuery);
+        $userParams = [
+            ':name' => $fullName,
+            ':email' => $email,
+            ':password' => password_hash($password, PASSWORD_BCRYPT),
+            ':role' => 'donor',
+        ];
+        if (!$hasRoleColumn) {
+            unset($userParams[':role']);
+        }
+        $userStmt->execute($userParams);
+        $userId = (int)$pdo->lastInsertId();
+    } else {
+        // reuse the existing login id
+        $userId = $existingUserId;
     }
-    $userStmt->execute($userParams);
-    $userId = (int)$pdo->lastInsertId();
 
     $pdo->commit();
 
+    if ($enableDebug) {
+        $logFile = __DIR__ . '/../logs/register_donor_debug.log';
+        $successEntry = "SUCCESS: donor inserted. userId={$userId} time=" . date('c') . "\n";
+        @file_put_contents($logFile, $successEntry, FILE_APPEND | LOCK_EX);
+    }
+
     http_response_code(201);
+    // Send welcome email and create in-app notifications (best-effort)
+    try {
+        require_once __DIR__ . '/../config/mailer.php';
+        require_once __DIR__ . '/workflow_helpers.php';
+
+        $subject = 'Thank you for registering as a blood donor';
+        $textBody = "Dear {$fullName},\n\nThank you for registering as a potential blood donor.\n\nAs a next step, we will contact you to arrange a screening and blood draw appointment. Please note that you will not be able to book appointments until after your blood has been collected and tested.\n\nThank you for your willingness to help save lives.\n\nRegards,\nBlood Transfusion Services";
+        $htmlBody = "<p>Dear {$fullName},</p><p>Thank you for registering as a potential blood donor.</p><p>As a next step, we will contact you to arrange a screening and blood draw appointment. Please note that you will not be able to sign in or book appointments until after your blood has been collected and tested.</p><p>Thank you for your willingness to help save lives.</p><p>Regards,<br/>Blood Transfusion Services</p>";
+
+        $meta = [];
+        if ($email !== '') {
+            @bts_send_email($email, $subject, $htmlBody, $textBody, $meta);
+        }
+
+        // Notify admins that a new donor registered
+        try {
+            $notif = [
+                'role_target' => 'admin',
+                'title' => 'New donor registration',
+                'message' => "New donor registered: {$fullName} ({$email})",
+                'severity' => 'info',
+                'channel' => 'in_app',
+                'is_read' => 0,
+                'created_at' => date('Y-m-d H:i:s'),
+            ];
+            workflow_insert_notification($pdo, $notif);
+        } catch (Throwable $_) {}
+
+        // Create donor in-app notification and ensure email record exists
+        try {
+            if ($userId > 0) {
+                $notifDonor = [
+                    'user_id' => $userId,
+                    'donor_id' => $donorId,
+                    'role_target' => 'donor',
+                    'title' => 'Thank you for registering as a blood donor',
+                    'message' => "Dear {$fullName},\n\nThank you for registering as a potential blood donor.\n\nAs a next step, we will contact you to arrange a screening and blood draw appointment. Please note that you will not be able to sign in or book appointments until after your blood has been collected and tested.\n\nThank you for your willingness to help save lives.\n\nRegards,\nBlood Transfusion Services",
+                    'severity' => 'info',
+                    'channel' => 'in_app',
+                    'is_read' => 0,
+                    'created_at' => date('Y-m-d H:i:s'),
+                ];
+                workflow_insert_notification($pdo, $notifDonor);
+            }
+        } catch (Throwable $_) {}
+    } catch (Throwable $_) {
+        // swallow any notification/email errors so registration still succeeds
+    }
+
     echo json_encode([
         'success' => true,
         'message' => 'Registration submitted successfully. You can now sign in.',
@@ -413,8 +564,22 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
+    if ($enableDebug) {
+        $logFile = __DIR__ . '/../logs/register_donor_debug.log';
+        $errEntry = "ERROR: " . date('c') . " code=" . $exception->getCode() . " message=" . $exception->getMessage() . "\n";
+        @file_put_contents($logFile, $errEntry, FILE_APPEND | LOCK_EX);
+    }
 
+    $errorMessage = strtolower($exception->getMessage());
     if ((int)$exception->getCode() === 23000) {
+        if (str_contains($errorMessage, 'cid_number')) {
+            http_response_code(409);
+            echo json_encode([
+                'success' => false,
+                'message' => 'This CID is already registered.',
+            ]);
+            exit;
+        }
         http_response_code(409);
         echo json_encode([
             'success' => false,

@@ -1,6 +1,4 @@
-const API_BASE = process.env.NODE_ENV === "development"
-  ? "http://localhost/blood_donation"
-  : "/blood_donation";
+const API_BASE = "/blood_donation";
 
 export const getApiBase = () => API_BASE;
 

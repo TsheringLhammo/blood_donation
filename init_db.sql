@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS tbldonors (
   full_name VARCHAR(200) NOT NULL,
   email VARCHAR(200) NULL,
   phone VARCHAR(50) NULL,
+  cid_number VARCHAR(11) UNIQUE DEFAULT NULL,
   blood_type VARCHAR(10) NULL,
   test_result VARCHAR(50) DEFAULT 'not_tested',
   workflow_status VARCHAR(60) DEFAULT 'awaiting_review',

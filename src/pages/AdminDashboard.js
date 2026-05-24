@@ -10,12 +10,20 @@ import "./AdminDashboard.css";
 import "./AdminDashboard-DeferModal.css";
 
 import { authFetch, clearAuthSession, getStoredUser } from "../utils/auth";
+import { titleCase } from "../utils/strings";
 
 import AdminShell from "../components/admin/AdminShell";
 
 import DonorDetailsPanel from "../components/admin/DonorDetailsPanel";
 
 import ViewDetailsModal from "../components/ViewDetailsModal";
+
+import CampRequestModal from "../components/CampRequestModal";
+
+import ConfirmationModal from "../components/ConfirmationModal";
+
+import DonorRecordsPanel from "../components/admin/DonorRecordsPanel";
+import DonationHistoryPanel from "../components/admin/DonationHistoryPanel";
 
 
 
@@ -101,6 +109,30 @@ export default function AdminDashboard() {
 
   const [archiveTarget, setArchiveTarget] = useState(null);
 
+  // Helper to trigger downloads from other windows
+  function DownloadLinkBlob(blob, filename) {
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  }
+
+  useEffect(() => {
+    const handleMessage = (event) => {
+      const data = event.data || {};
+      if (data.type !== 'donor-card-download' || !data.html || !data.filename) return;
+      DownloadLinkBlob(new Blob([data.html], { type: 'text/html;charset=utf-8' }), data.filename);
+      toast.success('Card downloaded.');
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   // Details modal state
   const [detailsModal, setDetailsModal] = useState({ isOpen: false, type: null, data: null });
 
@@ -133,6 +165,8 @@ export default function AdminDashboard() {
     availabilityStatus: "open",
     servicesText: "Blood Donation, Testing",
     types: ["A+", "A-", "B+", "B-", "AB+", "AB-"],
+    // inventory will be initialized when needed
+    inventory: {},
   });
 
   const [expandedDonorRows, setExpandedDonorRows] = useState(new Set());
@@ -161,6 +195,72 @@ export default function AdminDashboard() {
 
   const [permanentDeferralModal, setPermanentDeferralModal] = useState({ open: false, donorId: null, donorName: "", message: "" });
 
+  const [appointmentModal, setAppointmentModal] = useState({
+    open: false,
+    appointment: null,
+    preferred_date: "",
+    preferred_time: "",
+    blood_bank: "",
+    notes: "",
+    status: "confirmed",
+  });
+
+  const [rejectAppointmentModal, setRejectAppointmentModal] = useState({ open: false, appointment: null });
+
+  const [campModal, setCampModal] = useState({ open: false, camp: null, isLoading: false });
+
+  const [confirmationModal, setConfirmationModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'warning', isLoading: false });
+
+  const [savingAppointment, setSavingAppointment] = useState(false);
+
+  const formatTimeForInput = (value) => {
+    if (!value) return "";
+    const trimmed = String(value).trim();
+    if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+      return trimmed.padStart(5, '0');
+    }
+    if (/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(trimmed)) {
+      const [time, period] = trimmed.split(/\s+/);
+      let [hours, minutes] = time.split(':').map(Number);
+      const upper = period.toUpperCase();
+      if (upper === 'AM' && hours === 12) hours = 0;
+      if (upper === 'PM' && hours < 12) hours += 12;
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
+    if (/^\d{1,2}:\d{2}:\d{2}$/.test(trimmed)) {
+      const [hours, minutes] = trimmed.split(':');
+      return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
+    }
+    return "";
+  };
+
+  const normalizeAppointmentStatus = (value) => {
+    const status = String(value || "").trim().toLowerCase();
+    if (['completed', 'complete', 'done'].includes(status)) return 'completed';
+    if (['deferred', 'defer'].includes(status)) return 'deferred';
+    if (['cancelled', 'canceled', 'rejected', 'reject'].includes(status)) return 'cancelled';
+    if (['confirmed', 'confirm'].includes(status)) return 'confirmed';
+    if (!status || status === 'pending') return 'pending';
+    return status;
+  };
+
+  const getAppointmentStatusLabel = (value) => {
+    switch (normalizeAppointmentStatus(value)) {
+      case 'completed':
+        return 'Completed';
+      case 'deferred':
+        return 'Deferred';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'confirmed':
+        return 'Confirmed';
+      case 'pending':
+        return 'Pending';
+      default:
+        return value ? String(value) : 'Pending';
+    }
+  };
+
   const [deferralMonths, setDeferralMonths] = useState(6); // default 6 months for malaria/temporary deferral
 
   // Edit donor modal state
@@ -185,28 +285,182 @@ export default function AdminDashboard() {
 
   const [decisionMessage, setDecisionMessage] = useState("");
 
+  const [donationHistoryFilters, setDonationHistoryFilters] = useState({
+    donorName: "",
+    cid: "",
+    bloodGroup: "",
+    componentType: "",
+    bloodBank: "",
+    dateFrom: "",
+    dateTo: "",
+  });
+
+  const [appliedDonationHistoryFilters, setAppliedDonationHistoryFilters] = useState({
+    donorName: "",
+    cid: "",
+    bloodGroup: "",
+    componentType: "",
+    bloodBank: "",
+    dateFrom: "",
+    dateTo: "",
+  });
+
+  const donationHistoryRows = [
+    {
+      id: "DH-001",
+      date: "2026-05-23",
+      donorName: "Yangdon",
+      cid: "11225543210",
+      bloodGroup: "AB+",
+      bloodBank: "JDWNRH Thimphu",
+      componentType: "Whole Blood",
+      units: 1,
+      staffName: "Pema Dorji",
+      status: "Completed",
+    },
+    {
+      id: "DH-002",
+      date: "2026-05-18",
+      donorName: "Tshering Lhamo",
+      cid: "11531006200",
+      bloodGroup: "O+",
+      bloodBank: "Paro District Blood Bank",
+      componentType: "PRBC",
+      units: 1,
+      staffName: "Tshering Wangmo",
+      status: "Completed",
+    },
+    {
+      id: "DH-003",
+      date: "2026-04-30",
+      donorName: "Kinley Zangmo",
+      cid: "11770654321",
+      bloodGroup: "A+",
+      bloodBank: "Mongar Blood Bank",
+      componentType: "Platelets",
+      units: 1,
+      staffName: "Dawa",
+      status: "Pending",
+    },
+    {
+      id: "DH-004",
+      date: "2026-03-12",
+      donorName: "Pelden Lhamo",
+      cid: "12445678901",
+      bloodGroup: "B+",
+      bloodBank: "Thimphu Blood Bank",
+      componentType: "Plasma",
+      units: 1,
+      staffName: "Dorji Wangchuk",
+      status: "Rejected",
+    },
+  ];
+
+  const donationHistoryBloodBanks = [...new Set(donationHistoryRows.map((row) => row.bloodBank))];
+  const donationHistoryBloodGroups = [...new Set(donationHistoryRows.map((row) => row.bloodGroup))];
+  const donationHistoryComponentTypes = [...new Set(donationHistoryRows.map((row) => row.componentType))];
+
+  const maskCid = (cid) => {
+    const digits = String(cid || "").replace(/\D+/g, "");
+    if (digits.length <= 4) return digits || "—";
+    return `${digits.slice(0, 4)}****`;
+  };
+
+  const formatDonationDate = (value) => {
+    if (!value) return "—";
+    try {
+      return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+    } catch {
+      return value;
+    }
+  };
+
+  const getDonationHistoryStatusClass = (status) => {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "completed") return "completed";
+    if (normalized === "pending") return "pending";
+    if (normalized === "rejected") return "rejected";
+    return "pending";
+  };
+
+  const filteredDonationHistoryRows = donationHistoryRows.filter((row) => {
+    const completedOnly = String(row.status || "").toLowerCase() === "completed";
+    if (!completedOnly) return false;
+
+    const filters = appliedDonationHistoryFilters;
+    if (filters.donorName && !String(row.donorName || "").toLowerCase().includes(filters.donorName.toLowerCase())) return false;
+    if (filters.cid && !String(row.cid || "").includes(filters.cid.replace(/\D+/g, ""))) return false;
+    if (filters.bloodGroup && String(row.bloodGroup || "").toLowerCase() !== filters.bloodGroup.toLowerCase()) return false;
+    if (filters.componentType && String(row.componentType || "").toLowerCase() !== filters.componentType.toLowerCase()) return false;
+    if (filters.bloodBank && String(row.bloodBank || "").toLowerCase() !== filters.bloodBank.toLowerCase()) return false;
+    if (filters.dateFrom && row.date < filters.dateFrom) return false;
+    if (filters.dateTo && row.date > filters.dateTo) return false;
+    return true;
+  });
+
+  const donationHistoryStats = {
+    totalDonations: donationHistoryRows.filter((row) => String(row.status || "").toLowerCase() === "completed").length,
+    thisMonth: donationHistoryRows.filter((row) => String(row.status || "").toLowerCase() === "completed" && row.date.startsWith("2026-05")).length,
+    totalUnits: donationHistoryRows
+      .filter((row) => String(row.status || "").toLowerCase() === "completed")
+      .reduce((sum, row) => sum + Number(row.units || 0), 0),
+    activeBloodBanks: donationHistoryBloodBanks.length,
+  };
+
+  const updateDonationHistoryFilter = (field, value) => {
+    setDonationHistoryFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const applyDonationHistoryFilters = () => {
+    setAppliedDonationHistoryFilters({ ...donationHistoryFilters });
+  };
+
+  const clearDonationHistoryFilters = () => {
+    const empty = {
+      donorName: "",
+      cid: "",
+      bloodGroup: "",
+      componentType: "",
+      bloodBank: "",
+      dateFrom: "",
+      dateTo: "",
+    };
+    setDonationHistoryFilters(empty);
+    setAppliedDonationHistoryFilters(empty);
+  };
+
 
 
   const BLOOD_GROUP_OPTIONS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
-  const BANK_TYPES_FOR_FORM = ["A+", "A-", "B+", "B-", "AB+", "AB-"];
+  const BANK_TYPES_FOR_FORM = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
   const SAMPLE_BLOOD_BANKS = [
     { id: 9, name: "Bumthang Blood Bank", dzongkhag: "Bumthang", phone: "17967631", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Bumthang" },
-    { id: 2, name: "Phuentsholing Blood Bank", dzongkhag: "Chukha", phone: "05-252431", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Chukha" },
-    { id: 16, name: "Dagana District Blood Bank", dzongkhag: "Dagana", phone: "05-35116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Dagana" },
-    { id: 5, name: "Gasa District Blood Bank", dzongkhag: "Gasa", phone: "02-68116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Gasa" },
-    { id: 6, name: "Haa District Blood Bank", dzongkhag: "Haa", phone: "02-84116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Haa" },
-    { id: 13, name: "Lhuntse Blood Bank", dzongkhag: "Lhuntse", phone: "04-33116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Lhuntse" },
-    { id: 19, name: "Lingkorthakha District Blood Bank", dzongkhag: "Lingkorthakha", phone: "03-41116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Lingkorthakha" },
-    { id: 10, name: "Mongar Blood Bank", dzongkhag: "Mongar", phone: "04-64114", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Mongar" },
-    { id: 3, name: "Paro District Blood Bank", dzongkhag: "Paro", phone: "08-27116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Paro" },
-    { id: 20, name: "Pemagatshel District Blood Bank", dzongkhag: "Pemagatshel", phone: "07-53116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Pemagatshel" },
+    { id: 2, name: "Phuentsholing Blood Bank", dzongkhag: "Chukha", phone: "77895643", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Chukha" },
+    { id: 16, name: "Dagana District Blood Bank", dzongkhag: "Dagana", phone: "17896543", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Dagana" },
+    { id: 5, name: "Gasa District Blood Bank", dzongkhag: "Gasa", phone: "77895643", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Gasa" },
+    { id: 6, name: "Haa District Blood Bank", dzongkhag: "Haa", phone: "17656543", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Haa" },
+    { id: 13, name: "Lhuntse Blood Bank", dzongkhag: "Lhuntse", phone: "17665544", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Lhuntse" },
+    { id: 19, name: "Lingkorthakha District Blood Bank", dzongkhag: "Lingkorthakha", phone: "16789054", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Lingkorthakha" },
+    { id: 10, name: "Mongar Blood Bank", dzongkhag: "Mongar", phone: "17689054", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Mongar" },
+    { id: 3, name: "Paro District Blood Bank", dzongkhag: "Paro", phone: "77098765", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Paro" },
+    { id: 20, name: "Pemagatshel District Blood Bank", dzongkhag: "Pemagatshel", phone: "1753116", latitude: null, longitude: null, status: "active", availabilityStatus: "open", address: "Pemagatshel" },
   ];
 
 
 
   const parseApiError = useCallback(async (response, fallbackMessage = "Request failed.") => {
+
+    if (response.status === 401 || response.status === 403) {
+
+      clearAuthSession();
+
+      navigate("/login", { replace: true });
+
+      return "Your admin session expired. Please sign in again.";
+
+    }
 
     let message = fallbackMessage;
 
@@ -224,7 +478,7 @@ export default function AdminDashboard() {
 
     return `${message} (HTTP ${response.status})`;
 
-  }, []);
+  }, [navigate]);
 
   // Shared localStorage key for syncing admin -> public list without backend changes
   const SHARED_BANKS_KEY = "blood_banks_shared_v1";
@@ -242,8 +496,10 @@ export default function AdminDashboard() {
   const writeSharedBanks = useCallback((list) => {
     try {
       window.localStorage.setItem(SHARED_BANKS_KEY, JSON.stringify(list || []));
-      // notify other tabs
+      // Notify other tabs via storage event
       window.dispatchEvent(new Event('storage'));
+      // Notify the current tab (same window) via custom event
+      window.dispatchEvent(new CustomEvent('banks-updated', { detail: { banks: list } }));
     } catch (e) {
       // ignore write failures
     }
@@ -263,6 +519,7 @@ export default function AdminDashboard() {
           dzongkhag: b.dzongkhag || "",
           address: b.address || "",
           phone: b.phone || "",
+          email: b.email || "",
           hours: b.hours || "",
           emergency_phone: b.emergencyPhone || b.emergency_phone || b.phone || "",
           services: Array.isArray(b.services) ? b.services : (b.servicesText ? String(b.servicesText).split(",").map(s=>s.trim()).filter(Boolean) : []),
@@ -277,6 +534,64 @@ export default function AdminDashboard() {
       }
     } catch (e) {}
   }, [readSharedBanks, writeSharedBanks]);
+
+  // Fetch all blood banks without pagination for localStorage syncing
+  const fetchAllBloodBanksForSync = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      params.set("include_inactive", "1");
+      params.set("per_page", "1000"); // Fetch all banks
+      params.set("_t", Date.now().toString());
+
+      const res = await authFetch(`backend/api/get_blood_banks_admin.php?${params.toString()}`, { cache: "no-store" });
+
+      if (!res.ok) return [];
+
+      const data = await res.json();
+
+      if (!data.success) return [];
+
+      return Array.isArray(data.data) ? data.data : [];
+    } catch (error) {
+      console.error("Error fetching all blood banks for sync:", error);
+      return [];
+    }
+  }, [authFetch]);
+
+  // Sync fetched blood banks from API to localStorage so public page gets fresh data with emails
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const syncAllBanks = async () => {
+      const allBanks = await fetchAllBloodBanksForSync();
+      if (Array.isArray(allBanks) && allBanks.length > 0) {
+        try {
+          const mapped = allBanks.map((b) => ({
+            id: b.id,
+            name: b.name || "",
+            hospital: b.hospital || b.name || "",
+            dzongkhag: b.dzongkhag || "",
+            address: b.address || "",
+            phone: b.phone || "",
+            email: b.email || "",
+            hours: b.hours || "",
+            emergency_phone: b.emergency_phone || b.phone || "",
+            services: Array.isArray(b.services) ? b.services : (b.services_json ? (() => { try { return JSON.parse(b.services_json); } catch { return []; } })() : []),
+            types: Array.isArray(b.types) ? b.types : (b.types_csv ? b.types_csv.split(',').map(t => t.trim()).filter(Boolean) : ["A+","A-","B+","B-","AB+","AB-"]),
+            status: b.status || b.directory_status || "active",
+            availabilityStatus: b.availability_status || b.availabilityStatus || "open",
+            latitude: b.latitude ?? null,
+            longitude: b.longitude ?? null,
+            is_open_now: (b.availability_status || b.availabilityStatus || "open") === "open",
+          }));
+          writeSharedBanks(mapped);
+        } catch (e) {
+          // non-fatal: if mapping fails, keep existing localStorage data
+        }
+      }
+    };
+
+    syncAllBanks();
+  }, [fetchAllBloodBanksForSync, writeSharedBanks]);
 
   const normalizeBankFormFromRow = useCallback((bank) => {
     if (!bank) return null;
@@ -298,6 +613,13 @@ export default function AdminDashboard() {
       availabilityStatus: String(bank.availabilityStatus || bank.availability_status || "open"),
       servicesText: Array.isArray(bank.services) ? bank.services.join(", ") : "Blood Donation, Testing",
       types: Array.isArray(bank.types) && bank.types.length > 0 ? bank.types : ["A+", "A-", "B+", "B-", "AB+", "AB-"],
+      inventory: (() => {
+        try {
+          if (bank.inventory && typeof bank.inventory === 'object') return bank.inventory;
+          if (bank.inventory_json) return JSON.parse(bank.inventory_json);
+          return defaultInventoryForBank();
+        } catch (e) { return defaultInventoryForBank(); }
+      })(),
     };
   }, []);
 
@@ -306,6 +628,35 @@ export default function AdminDashboard() {
     if (!text) return null;
     const n = Number(text);
     return Number.isFinite(n) ? n : null;
+  };
+
+  const defaultInventoryForBank = () => ({
+    PRBC: Object.fromEntries(BLOOD_GROUP_OPTIONS.map(bt => [bt, { units: 0, min: 5 }])),
+    Platelets: Object.fromEntries(BLOOD_GROUP_OPTIONS.map(bt => [bt, { units: 0, min: 5 }])),
+    Plasma: Object.fromEntries(BLOOD_GROUP_OPTIONS.map(bt => [bt, { units: 0, min: 5 }])),
+    Wholeblood: Object.fromEntries(BLOOD_GROUP_OPTIONS.map(bt => [bt, { units: 0, min: 5 }]))
+  });
+
+  const getInventoryTotalUnits = (inventory) => {
+    if (!inventory || typeof inventory !== 'object') return 0;
+    return Object.values(inventory).reduce((componentTotal, componentRows) => {
+      if (!componentRows || typeof componentRows !== 'object') return componentTotal;
+      return componentTotal + Object.values(componentRows).reduce((bloodTypeTotal, row) => {
+        const units = Number(row?.units || 0);
+        return bloodTypeTotal + (Number.isFinite(units) ? units : 0);
+      }, 0);
+    }, 0);
+  };
+
+  const updateInventoryField = (component, bloodType, field, value) => {
+    setBankForm((prev) => {
+      const inv = prev.inventory ? { ...prev.inventory } : defaultInventoryForBank();
+      inv[component] = { ...inv[component] };
+      const btRow = inv[component][bloodType] ? { ...inv[component][bloodType] } : { units: 0, min: 5 };
+      btRow[field] = value;
+      inv[component][bloodType] = btRow;
+      return { ...prev, inventory: inv };
+    });
   };
 
   const resetBankForm = useCallback(() => {
@@ -326,6 +677,7 @@ export default function AdminDashboard() {
       availabilityStatus: "open",
       servicesText: "Blood Donation, Testing",
       types: ["A+", "A-", "B+", "B-", "AB+", "AB-"],
+      inventory: defaultInventoryForBank(),
     });
   }, []);
 
@@ -397,6 +749,7 @@ export default function AdminDashboard() {
         types: Array.isArray(source.types) && source.types.length > 0 ? source.types : ["A+", "A-", "B+", "B-", "AB+", "AB-"],
         status: source.status || "active",
         availabilityStatus: source.availabilityStatus || "open",
+        inventory: source.inventory || null,
       };
 
       const res = await authFetch("backend/api/save_blood_bank.php", {
@@ -412,33 +765,45 @@ export default function AdminDashboard() {
       toast.success(data.message || "Blood bank saved successfully.");
       resetBankForm();
       setBloodBankPage(1);
-      fetchBloodBanks();
-      // Update shared localStorage so public view reflects this change immediately
+      
+      // Update localStorage immediately with the saved bank data
       try {
-        const payloadId = data.data && data.data.id ? data.data.id : payload.id || genLocalId();
-        const saved = {
-          id: payloadId,
+        const savedBank = {
+          id: payload.id || (data.data?.id),
           name: payload.name,
           hospital: payload.hospital || payload.name,
           dzongkhag: payload.dzongkhag,
           address: payload.address,
           phone: payload.phone,
+          email: payload.email,
           hours: payload.hours,
-          emergency_phone: payload.emergencyPhone || payload.emergency || payload.phone,
+          emergency_phone: payload.emergencyPhone || payload.phone,
+          emergency: payload.emergency,
           services: Array.isArray(payload.services) ? payload.services : [],
           types: Array.isArray(payload.types) ? payload.types : [],
           status: payload.status || "active",
           availabilityStatus: payload.availabilityStatus || "open",
           latitude: payload.latitude ?? null,
           longitude: payload.longitude ?? null,
-          is_open_now: (payload.availabilityStatus || payload.availabilityStatus) === "open",
+          is_open_now: (payload.availabilityStatus || "open") === "open",
         };
+        
         const current = readSharedBanks() || [];
-        const idx = current.findIndex((b) => String(b.id) === String(saved.id));
-        if (idx >= 0) current[idx] = { ...current[idx], ...saved };
-        else current.unshift(saved);
+        const idx = current.findIndex((b) => String(b.id) === String(savedBank.id));
+        if (idx >= 0) {
+          // Update existing bank
+          current[idx] = { ...current[idx], ...savedBank };
+        } else {
+          // Add new bank
+          current.unshift(savedBank);
+        }
         writeSharedBanks(current);
-      } catch (e) { /* non-fatal */ }
+      } catch (e) { 
+        console.error('Error updating localStorage after save:', e);
+      }
+      
+      // Also fetch fresh from database to ensure synchronization
+      fetchBloodBanks();
     } catch (error) {
       setBankMessage(error.message || "Could not save blood bank.");
       toast.error(error.message || "Could not save blood bank.");
@@ -462,18 +827,21 @@ export default function AdminDashboard() {
       setArchiveTarget(bank.id);
       setBankMessage(data.message || "Blood bank archived successfully.");
       toast.success(data.message || "Blood bank archived successfully.");
-      fetchBloodBanks();
-      // reflect archive in shared localStorage
+      
+      // Update localStorage immediately to reflect archive
       try {
         const current = readSharedBanks() || [];
         const idx = current.findIndex((b) => String(b.id) === String(bank.id));
         if (idx >= 0) {
           current[idx] = { ...current[idx], status: "archived" };
-        } else {
-          current.unshift({ ...bank, status: "archived" });
         }
         writeSharedBanks(current);
-      } catch (e) { /* non-fatal */ }
+      } catch (e) {
+        console.error('Error updating localStorage after archive:', e);
+      }
+      
+      // Also fetch fresh from database
+      fetchBloodBanks();
     } catch (error) {
       setBankMessage(error.message || "Could not archive blood bank.");
       toast.error(error.message || "Could not archive blood bank.");
@@ -696,7 +1064,7 @@ export default function AdminDashboard() {
 
         donor_id: editDonorModal.donorId,
 
-        full_name: editDonorModal.full_name.trim(),
+        full_name: titleCase(editDonorModal.full_name || ''),
 
         email: editDonorModal.email.trim().toLowerCase(),
 
@@ -771,9 +1139,9 @@ export default function AdminDashboard() {
 
     const parsed = getStoredUser();
 
-    if (!parsed?.token) { navigate("/login"); return; }
+    if (!parsed?.token) { clearAuthSession(); navigate("/login", { replace: true }); return; }
 
-    if (parsed.role !== "admin") { navigate("/dashboard"); return; }
+    if (parsed.role !== "admin") { clearAuthSession(); navigate("/", { replace: true }); return; }
 
     setUser(parsed);
 
@@ -815,7 +1183,22 @@ export default function AdminDashboard() {
 
       const data = await res.json();
 
-      if (data.success) setAppointments(data.data);
+      if (data.success) {
+        const normalizedAppointments = Array.isArray(data.data)
+          ? data.data.map((row) => {
+              const statusSource = row.status ?? row.appointment_status ?? row.status_label ?? row.current_status ?? '';
+              const status_key = normalizeAppointmentStatus(statusSource);
+              return {
+                ...row,
+                status_key,
+                status_label: getAppointmentStatusLabel(statusSource),
+                status: getAppointmentStatusLabel(statusSource),
+              };
+            })
+          : [];
+
+        setAppointments(normalizedAppointments);
+      }
 
       else setErrorAppointments(data.message || "Failed to load appointments.");
 
@@ -1037,7 +1420,10 @@ export default function AdminDashboard() {
 
       params.set("per_page", String(bloodBankPerPage));
 
-      const res = await authFetch(`backend/api/get_blood_banks_admin.php?${params.toString()}`);
+      // Add cache-busting timestamp
+      params.set("_t", Date.now().toString());
+
+      const res = await authFetch(`backend/api/get_blood_banks_admin.php?${params.toString()}`, { cache: "no-store" });
 
       if (!res.ok) throw new Error(await parseApiError(res, "Failed to load blood banks."));
 
@@ -1045,13 +1431,20 @@ export default function AdminDashboard() {
 
       if (!data.success) throw new Error(data.message || "Failed to load blood banks.");
 
-      setBloodBanks(Array.isArray(data.data) ? data.data : []);
+      const banksList = Array.isArray(data.data) ? data.data : [];
 
-      setBloodBankPagination(data.pagination || { total: Array.isArray(data.data) ? data.data.length : 0, totalPages: 1, page: bloodBankPage, perPage: bloodBankPerPage });
+      setBloodBanks(banksList);
+
+      setBloodBankPagination(data.pagination || { total: banksList.length, totalPages: 1, page: bloodBankPage, perPage: bloodBankPerPage });
+
+      // Return the fetched banks for immediate use
+      return banksList;
 
     } catch (error) {
 
       setErrorBloodBanks(error.message || "Could not reach server.");
+
+      return [];
 
     } finally { setLoadingBloodBanks(false); }
 
@@ -1418,10 +1811,20 @@ export default function AdminDashboard() {
 
   // Admin Decision Handlers
 
-  const openDeferTemporaryModal = (donorId, donorName, months = 6) => {
+  const buildTemporaryDeferralContent = useCallback((donorName, monthsValue) => {
+    const safeMonths = Number(monthsValue) || 3;
+    const nextEligibleDate = new Date();
+    nextEligibleDate.setMonth(nextEligibleDate.getMonth() + safeMonths);
 
-    const defaultUntil = new Date();
-    defaultUntil.setMonth(defaultUntil.getMonth() + Number(months));
+    return {
+      months: safeMonths,
+      nextEligibleIso: nextEligibleDate.toISOString().split('T')[0],
+      message: `Dear ${donorName}, thank you for your willingness to donate blood. Based on your screening results, you are temporarily deferred for ${safeMonths} months. Please return on or after ${nextEligibleDate.toLocaleDateString()} for re-evaluation.`,
+    };
+  }, []);
+
+  const openDeferTemporaryModal = (donorId, donorName, months = 6) => {
+    const content = buildTemporaryDeferralContent(donorName, months);
 
     setDeferTemporaryModal({
 
@@ -1431,13 +1834,24 @@ export default function AdminDashboard() {
 
       donorName,
 
-      months: Number(months),
+      months: content.months,
 
-      message: `Dear ${donorName}, thank you for your willingness to donate blood. Based on your screening results, you are temporarily deferred for ${months} months. Please return on or after ${defaultUntil.toLocaleDateString()} for re-evaluation.`,
+      message: content.message,
 
     });
 
   };
+
+  const handleTemporaryDeferralMonthsChange = useCallback((monthsValue) => {
+    setDeferTemporaryModal((prev) => {
+      const content = buildTemporaryDeferralContent(prev.donorName, monthsValue);
+      return {
+        ...prev,
+        months: content.months,
+        message: content.message,
+      };
+    });
+  }, [buildTemporaryDeferralContent]);
 
 
 
@@ -1601,7 +2015,9 @@ export default function AdminDashboard() {
 
     const { donorId, months } = deferTemporaryModal;
 
-    if (!donorId || !months) return;
+    const selectedMonths = Number(months) || 0;
+
+    if (!donorId || !selectedMonths) return;
 
     setProcessingDecision(true);
 
@@ -1609,9 +2025,7 @@ export default function AdminDashboard() {
 
     try {
 
-      const deferUntilDate = new Date();
-
-      deferUntilDate.setMonth(deferUntilDate.getMonth() + Number(months));
+      const content = buildTemporaryDeferralContent(deferTemporaryModal.donorName, selectedMonths);
 
       
 
@@ -1665,13 +2079,15 @@ export default function AdminDashboard() {
 
           workflow_status: "temporarily_deferred",
 
-          defer_until: deferUntilDate.toISOString().split('T')[0],
+          defer_until: content.nextEligibleIso,
 
-          defer_months: months,
+          defer_months: selectedMonths,
+
+          decision_notes: `Temporary deferral for ${selectedMonths} months`,
 
           message: deferTemporaryModal.message,
 
-          next_eligible_date: deferUntilDate.toISOString().split('T')[0]
+          next_eligible_date: content.nextEligibleIso
 
         }),
 
@@ -1875,49 +2291,141 @@ export default function AdminDashboard() {
 
 
   // Appointment action handlers
-  const handleAcceptAppointment = async (appointment) => {
-    console.log('Accept appointment clicked:', appointment);
+  const openAppointmentModal = (appointment) => {
+    setAppointmentModal({
+      open: true,
+      appointment,
+      preferred_date: appointment.preferred_date || "",
+      preferred_time: formatTimeForInput(appointment.preferred_time || ""),
+      blood_bank: appointment.blood_bank || "",
+      notes: appointment.notes || "",
+      status: "confirmed",
+    });
+  };
+
+  const closeAppointmentModal = () => {
+    setAppointmentModal({
+      open: false,
+      appointment: null,
+      preferred_date: "",
+      preferred_time: "",
+      blood_bank: "",
+      notes: "",
+      status: "confirmed",
+    });
+  };
+
+  const handleSaveAndAcceptAppointment = async () => {
+    if (!appointmentModal.appointment || !appointmentModal.preferred_date || !appointmentModal.preferred_time) {
+      toast.error('Please provide the appointment date and time before accepting.');
+      return;
+    }
+
+    setSavingAppointment(true);
     try {
-      const res = await authFetch("backend/api/accept_appointment.php", {
+      const res = await authFetch("backend/api/update_appointment.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: appointment.id })
+        body: JSON.stringify({
+          id: appointmentModal.appointment.id,
+          preferred_date: appointmentModal.preferred_date,
+          preferred_time: appointmentModal.preferred_time,
+          blood_bank: appointmentModal.blood_bank,
+          notes: appointmentModal.notes,
+          status: 'confirmed',
+        }),
       });
-      console.log('API response status:', res.status);
+
       const data = await res.json();
-      console.log('API response data:', data);
       if (data.success) {
-        toast.success(`Appointment for ${appointment.full_name} confirmed successfully`);
-        fetchAppointments(); // Refresh the appointments list
+        toast.success(`Appointment for ${appointmentModal.appointment.full_name} confirmed successfully`);
+        fetchAppointments();
+        closeAppointmentModal();
       } else {
-        toast.error(data.message || "Failed to accept appointment");
+        toast.error(data.message || 'Failed to save and accept appointment');
       }
     } catch (error) {
-      console.error('Error accepting appointment:', error);
-      toast.error("Error accepting appointment");
+      console.error('Error saving appointment:', error);
+      toast.error('Error saving and accepting appointment');
+    } finally {
+      setSavingAppointment(false);
     }
   };
 
-  const handleRejectAppointment = async (appointment) => {
-    console.log('Reject appointment clicked:', appointment);
+  const openRejectAppointmentModal = (appointment) => {
+    setRejectAppointmentModal({ open: true, appointment });
+  };
+
+  const closeRejectAppointmentModal = () => {
+    setRejectAppointmentModal({ open: false, appointment: null });
+  };
+
+  const handleConfirmRejectAppointment = async () => {
+    if (!rejectAppointmentModal.appointment) {
+      toast.error('No appointment selected to reject.');
+      return;
+    }
+
+    setSavingAppointment(true);
     try {
-      const res = await authFetch("backend/api/reject_appointment.php", {
+      const res = await authFetch("backend/api/update_appointment.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: appointment.id })
+        body: JSON.stringify({
+          id: rejectAppointmentModal.appointment.id,
+          status: 'rejected',
+        }),
       });
-      console.log('Reject API response status:', res.status);
+
       const data = await res.json();
-      console.log('Reject API response data:', data);
       if (data.success) {
-        toast.success(`Appointment for ${appointment.full_name} rejected successfully`);
-        fetchAppointments(); // Refresh the appointments list
+        toast.success(`Appointment for ${rejectAppointmentModal.appointment.full_name} rejected successfully`);
+        fetchAppointments();
+        closeRejectAppointmentModal();
       } else {
-        toast.error(data.message || "Failed to reject appointment");
+        toast.error(data.message || 'Failed to reject appointment');
       }
     } catch (error) {
       console.error('Error rejecting appointment:', error);
-      toast.error("Error rejecting appointment");
+      toast.error('Error rejecting appointment');
+    } finally {
+      setSavingAppointment(false);
+    }
+  };
+
+  const handleAppointmentDetailsAction = async (action, appointment) => {
+    if (!appointment || !appointment.id) {
+      toast.error('No appointment selected.');
+      return { success: false };
+    }
+
+    try {
+      const res = await authFetch('backend/api/update_appointment_action.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appointmentId: appointment.id,
+          action,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to update appointment.');
+      }
+
+      const nextStatus = data?.data?.status || (action === 'completed' ? 'Completed' : action === 'deferred' ? 'Deferred' : 'Cancelled');
+      toast.success(`Appointment for ${appointment.full_name} ${nextStatus.toLowerCase()}.`);
+      fetchAppointments();
+      setDetailsModal((prev) => prev.isOpen && prev.type === 'appointment' && prev.data?.id === appointment.id
+        ? { ...prev, data: { ...prev.data, status: nextStatus } }
+        : prev
+      );
+
+      return { success: true, status: nextStatus };
+    } catch (error) {
+      toast.error(error.message || 'Could not update appointment.');
+      return { success: false };
     }
   };
 
@@ -1931,8 +2439,68 @@ export default function AdminDashboard() {
   };
 
   // Camp request action handlers
+  const openCampModal = (camp) => {
+    setCampModal({ open: true, camp, isLoading: false });
+  };
+
+  const closeCampModal = () => {
+    setCampModal({ open: false, camp: null, isLoading: false });
+  };
+
+  const refreshCampModal = async () => {
+    if (!campModal.camp) return;
+    
+    try {
+      // Fetch fresh camp data from the API
+      const res = await authFetch("backend/api/get_camps.php?_ts=" + Date.now(), { 
+        cache: "no-store" 
+      });
+      
+      if (!res.ok) throw new Error("Failed to refresh");
+      
+      const data = await res.json();
+      if (data.success && data.data) {
+        // Find the current camp in the fresh data
+        const updatedCamp = data.data.find(c => c.id === campModal.camp.id);
+        if (updatedCamp) {
+          setCampModal({ open: true, camp: updatedCamp, isLoading: false });
+          toast.success("Data refreshed from database");
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing camp data:', error);
+      toast.error("Failed to refresh data");
+    }
+  };
+
+  const handleSaveCampChanges = async (updatedData) => {
+    // Update the camps list with the new data
+    const updatedCamps = camps.map(camp => 
+      camp.id === updatedData.id 
+        ? {
+            ...camp,
+            organization_name: updatedData.organization,
+            contact_person: updatedData.contact_person,
+            phone_number: updatedData.phone,
+            email: updatedData.email,
+            preferred_date: updatedData.date,
+            expected_donors: updatedData.expected_participants
+          }
+        : camp
+    );
+    
+    setCamps(updatedCamps);
+    
+    // Also update the modal with the new camp data
+    const updatedCamp = updatedCamps.find(c => c.id === updatedData.id);
+    if (updatedCamp) {
+      setCampModal({ open: true, camp: updatedCamp, isLoading: false });
+    }
+  };
+
   const handleAcceptCamp = async (camp) => {
     console.log('Accept camp clicked:', camp);
+    setCampModal(prev => ({ ...prev, isLoading: true }));
     try {
       const res = await authFetch("backend/api/accept_camp_request.php", {
         method: "POST",
@@ -1944,6 +2512,7 @@ export default function AdminDashboard() {
       console.log('Accept camp API response data:', data);
       if (data.success) {
         toast.success(`Camp request from ${camp.organization_name} accepted successfully`);
+        closeCampModal();
         fetchCamps(); // Refresh the camps list
       } else {
         toast.error(data.message || "Failed to accept camp request");
@@ -1951,11 +2520,14 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error accepting camp request:', error);
       toast.error("Error accepting camp request");
+    } finally {
+      setCampModal(prev => ({ ...prev, isLoading: false }));
     }
   };
 
   const handleRejectCamp = async (camp) => {
     console.log('Reject camp clicked:', camp);
+    setConfirmationModal(prev => ({ ...prev, isLoading: true }));
     try {
       const res = await authFetch("backend/api/reject_camp_request.php", {
         method: "POST",
@@ -1967,13 +2539,17 @@ export default function AdminDashboard() {
       console.log('Reject camp API response data:', data);
       if (data.success) {
         toast.success(`Camp request from ${camp.organization_name} rejected successfully`);
+        setConfirmationModal({ isOpen: false, title: '', message: '', onConfirm: null, type: 'warning', isLoading: false });
+        closeCampModal();
         fetchCamps(); // Refresh the camps list
       } else {
         toast.error(data.message || "Failed to reject camp request");
+        setConfirmationModal({ isOpen: false, title: '', message: '', onConfirm: null, type: 'warning', isLoading: false });
       }
     } catch (error) {
       console.error('Error rejecting camp request:', error);
       toast.error("Error rejecting camp request");
+      setConfirmationModal({ isOpen: false, title: '', message: '', onConfirm: null, type: 'warning', isLoading: false });
     }
   };
 
@@ -2280,9 +2856,11 @@ export default function AdminDashboard() {
 
     // If test result is positive or reactive, check for deferral type
 
-    if (testResult === 'Positive' || testResult === 'Reactive' || 
+    const positiveSignalText = [testResult, testResultDisplay]
+      .map((value) => String(value || '').toLowerCase())
+      .join(' ');
 
-        testResultDisplay === 'Positive' || testResultDisplay === 'Reactive') {
+    if (positiveSignalText.includes('positive') || positiveSignalText.includes('reactive')) {
 
       const positiveDiseases = getPositiveDiseaseLabel(row).toLowerCase();
       const rawPositiveText = [
@@ -2403,11 +2981,144 @@ export default function AdminDashboard() {
   });
 
   const bankRows = Array.isArray(bloodBanks) && bloodBanks.length > 0 ? bloodBanks : fallbackFilteredBanks;
+  const isFeatureView = ["donorRecords", "donationHistory", "certificates", "donorCards"].includes(activeTab);
+
+  const featureViews = {
+    donorRecords: {
+      title: "Donor Records",
+      subtitle: "Complete donor list with search, filters, export, and profile preview.",
+      stats: [
+        { label: "Visible columns", value: "CID, Name, Group, Phone" },
+        { label: "Rows per page", value: "10 / 25 / 50 / 100" },
+        { label: "Export", value: "CSV" },
+      ],
+      tableHead: ["#", "CID", "Name", "Blood Group", "Phone", "Email", "Last Donation", "Total", "Next Eligible", "Status"],
+      tableRows: [
+        ["1", "1122****", "Yangdon", "AB+", "17655432", "yangdon@example.com", "15 May 2026", "7", "13 Aug 2026", "Active"],
+        ["2", "1153****", "Tshering Lhamo", "O+", "17654321", "tshering@example.com", "Never", "0", "N/A", "Pending"],
+      ],
+    },
+    donationHistory: {
+      title: "Donation History",
+      subtitle: "Every donation event across donors, blood banks, components, and staff.",
+      stats: [
+        { label: "Total Donations", value: "156" },
+        { label: "This Month", value: "18" },
+        { label: "Total Units", value: "245" },
+      ],
+      tableHead: ["#", "Date", "Donor", "CID", "Blood Bank", "Component", "Units", "Staff", "Status"],
+      tableRows: [
+        ["1", "15 May 2026", "Yangdon", "1122****", "JDWNRH Thimphu", "Whole Blood", "1", "Pema Dorji", "Completed"],
+        ["2", "10 Feb 2026", "Yangdon", "1122****", "Paro", "PRBC", "1", "Tshering Wangmo", "Completed"],
+      ],
+    },
+    certificates: {
+      title: "Certificates",
+      subtitle: "Generate appreciation letters and certificates based on donation milestones.",
+      stats: [
+        { label: "Eligibility", value: "1 / 3 / 5 / 10 / 20+" },
+        { label: "Formats", value: "Preview, PDF, Print" },
+        { label: "History", value: "Saved per donor" },
+      ],
+      tableHead: ["Issue Date", "Donor", "CID", "Certificate Type", "Donations", "Status"],
+      tableRows: [
+        ["22 May 2026", "Yangdon", "1122****", "Certificate of Appreciation", "7", "Issued"],
+        ["10 Jan 2026", "Yangdon", "1122****", "Appreciation Letter", "3", "Issued"],
+      ],
+    },
+    donorCards: {
+      title: "Donor Cards",
+      subtitle: "Digital donor ID cards with QR, masked CID, print and PDF download.",
+      stats: [
+        { label: "Validity", value: "1 year" },
+        { label: "QR Code", value: "Full CID encoded" },
+        { label: "Formats", value: "Print, PDF, View Full Size" },
+      ],
+      tableHead: ["Issue Date", "Donor", "CID", "Card Number", "Status"],
+      tableRows: [
+        ["22 May 2026", "Yangdon", "1122****", "CARD-00014", "Active"],
+        ["10 Jan 2026", "Yangdon", "1122****", "CARD-00008", "Expired"],
+      ],
+    },
+  };
+
+  const renderFeatureView = (key) => {
+    const feature = featureViews[key];
+    if (!feature) return null;
+
+    if (key === "donorRecords") {
+      return <DonorRecordsPanel embedded />;
+    }
+
+    if (key === "donationHistory") {
+      return <DonationHistoryPanel embedded />;
+    }
+
+    return (
+      <div className="admin-dashboard-grid">
+        <article className="admin-panel-card admin-panel-wide">
+          <div className="admin-panel-head"><h3>{feature.title}</h3></div>
+          <p style={{ marginTop: 0, color: "#64748b" }}>{feature.subtitle}</p>
+          <div className="admin-mini-list" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+            {feature.stats.map((item) => (
+              <div key={item.label} className="admin-card" style={{ margin: 0, minHeight: 120 }}>
+                <h3 style={{ marginTop: 0 }}>{item.label}</h3>
+                <p className="admin-value" style={{ marginBottom: 0 }}>{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </article>
+        {key === 'donorCards' ? (
+          <article className="admin-panel-card admin-panel-wide">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 12 }}>
+              <button
+                className="admin-action-btn"
+                onClick={() => {
+                  const donorName = 'Tshering Lhamo';
+                  const donorId = 'DONOR-00014';
+                  const fullCid = '17656565';
+                  const bloodGroup = 'O+';
+                  const issueDate = '22 May 2026';
+                  const initials = donorName.split(/\s+/).map(p => p.charAt(0).toUpperCase()).slice(0,2).join('') || 'D';
+                  const qrValue = encodeURIComponent(`donor:${donorId}|cid:${fullCid}|name:${donorName}|group:${bloodGroup}`);
+                  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Donor Card - ${donorName}</title><meta name="viewport" content="width=device-width,initial-scale=1"/><style>body{font-family:Arial,sans-serif;margin:0;background:#f5f0eb;color:#111827} .card-wrap{max-width:980px;margin:28px auto;background:#fff;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,0.12);overflow:hidden} .top{background:linear-gradient(90deg,#bf131e,#9a111c);color:#fff;padding:18px 26px;display:flex;justify-content:space-between;align-items:center} .brand{font-weight:800} .pill{background:#fff;color:#b31622;padding:8px 16px;border-radius:999px;font-weight:800} .body{padding:22px} .main{display:grid;grid-template-columns:160px 1fr 170px;gap:18px;align-items:start} .avatar{width:138px;height:138px;border-radius:50%;border:4px solid #bf131e;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:800;color:#2f3a4a;background:radial-gradient(circle at 30% 20%,#fff,#f0f3f8)} .details h2{margin:0;font-size:40px;color:#b31622} .row{display:grid;grid-template-columns:132px 12px 1fr;gap:8px;padding:6px 0;font-size:20px} .label{color:#4b5563;font-weight:600} .value{font-weight:800} .qr{border:1px solid #e5e7eb;border-radius:14px;padding:10px;display:flex;align-items:center;justify-content:center} .footer{background:linear-gradient(90deg,#b0111c,#8e0f18);color:#fff;padding:14px 20px;font-weight:700;display:flex;align-items:center;gap:10px} .actions{display:flex;gap:16px;justify-content:center;padding:18px}</style></head><body><div class="card-wrap"><div class="top"><div class="brand">BLOOD TRANSFUSION SERVICE<br/>ROYAL GOVERNMENT OF BHUTAN</div><div class="pill">DONOR CARD</div></div><div class="body"><div class="main"><div class="avatar">${initials}</div><div class="details"><h2>${donorName}</h2><div style="font-weight:700;margin-bottom:12px">Donor ID: ${donorId}</div><div class="row"><div class="label">CID</div><div>:</div><div class="value">${fullCid}</div></div><div class="row"><div class="label">Blood Group</div><div>:</div><div class="value">${bloodGroup}</div></div><div class="row"><div class="label">Issue Date</div><div>:</div><div class="value">${issueDate}</div></div><div class="row"><div class="label">Blood Type</div><div>:</div><div class="value">Whole Blood</div></div></div><div class="qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrValue}" alt="qr"/></div></div></div><div class="footer">❤ Every Drop Counts, Every Donor Matters</div></div><div class="actions"><button onclick="window.print()" style="padding:10px 16px;border-radius:8px;border:1px solid #ddd;background:#fff;font-weight:700;">Print Card</button><button onclick="(function(){if(window.opener){window.opener.postMessage({type:'donor-card-download',filename:'${donorId.toLowerCase()}-card.html',html:document.documentElement.outerHTML}, '*');}else{var a=document.createElement('a');var blob=new Blob([document.documentElement.outerHTML],{type:'text/html'});a.href=URL.createObjectURL(blob);a.download='${donorId.toLowerCase()}-card.html';document.body.appendChild(a);a.click();a.remove();}})()" style="padding:10px 16px;border-radius:8px;border:1px solid #ddd;background:#fff;font-weight:700;margin-left:8px;">Download</button><button onclick="(function(){var w=window.open('','_blank','width=1400,height=980,scrollbars=yes,resizable=yes');if(!w) return;w.document.open();w.document.write(document.documentElement.outerHTML);w.document.close();w.focus();})()" style="padding:10px 16px;border-radius:8px;border:0;background:#b31622;color:#fff;font-weight:700;margin-left:8px;">View Full Size</button></div></body></html>`;
+                  const popup = window.open('', '_blank', 'width=1100,height=760,scrollbars=yes,resizable=yes');
+                  if (!popup) { toast.error('Popup blocked. Please allow popups for this site.'); return; }
+                  popup.document.write(html);
+                  popup.document.close();
+                }}
+              >
+                View in Action
+              </button>
+            </div>
+          </article>
+        ) : null}
+
+        <article className="admin-panel-card admin-panel-wide">
+          <div className="admin-panel-head"><h3>Design Preview</h3></div>
+          <div style={{ overflowX: "auto" }}>
+            <table className="admin-table">
+              <thead>
+                <tr>{feature.tableHead.map((head) => (<th key={head}>{head}</th>))}</tr>
+              </thead>
+              <tbody>
+                {feature.tableRows.map((row, index) => (
+                  <tr key={`${key}-${index}`}>
+                    {row.map((cell, cellIndex) => <td key={`${key}-${index}-${cellIndex}`}>{cell}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+    );
+  };
 
 
 
   return (
-    <AdminShell user={user} onLogout={handleLogout}>
+    <AdminShell user={user} onLogout={handleLogout} activeView={activeTab} onChangeView={setActiveTab}>
       <div className="admin-dashboard">
       <div className="admin-page">
         {bannerToast ? <div className={`admin-toast ${bannerToast.type}`}>{bannerToast.message}</div> : null}
@@ -2468,7 +3179,12 @@ export default function AdminDashboard() {
 
           {actionError && <div className="admin-table-msg error" style={{ margin: "0 0 12px" }}>{actionError}</div>}
 
-          <div className="admin-tabs-bar">
+          {activeTab === "donorRecords" && renderFeatureView("donorRecords")}
+          {activeTab === "donationHistory" && renderFeatureView("donationHistory")}
+          {activeTab === "certificates" && renderFeatureView("certificates")}
+          {activeTab === "donorCards" && renderFeatureView("donorCards")}
+
+          {!isFeatureView && <div className="admin-tabs-bar">
 
             <button className={`admin-tab${activeTab === "dashboard" ? " active" : ""}`} onClick={() => setActiveTab("dashboard")}>📊 Dashboard</button>
 
@@ -2488,11 +3204,9 @@ export default function AdminDashboard() {
 
             <button className={`admin-tab${activeTab === "bloodBanks" ? " active" : ""}`} onClick={() => setActiveTab("bloodBanks")}>🏥 Blood Banks{bloodBanks && <span className="admin-tab-count">{bloodBanks.length}</span>}</button>
 
-            <button className={`admin-tab${activeTab === "notifications" ? " active" : ""}`} onClick={() => setActiveTab("notifications")}>🔔 Notifications{unreadNotificationCount > 0 && <span className="admin-tab-count">{unreadNotificationCount} new</span>}</button>
-
             <button className="admin-refresh-btn" onClick={handleRefresh}>↺ Refresh</button>
 
-          </div>
+          </div>}
 
 
 
@@ -2652,7 +3366,7 @@ export default function AdminDashboard() {
 
                                   ) : null}
 
-                                  <button className="admin-action-btn confirm" onClick={() => handleDonorApproval(row.id, "confirmed")}>Approve to Donate</button>
+                                  <button className="admin-action-btn confirm" onClick={() => handleDonorApproval(row.id, "confirmed")}>Approve for blood draw</button>
 
                                   <button className="admin-action-btn reject" onClick={() => handleDonorApproval(row.id, "rejected")} disabled={isRejected}>Reject (with reason)</button>
 
@@ -2675,6 +3389,8 @@ export default function AdminDashboard() {
                                 <div className="admin-detail-field"><span className="admin-detail-label">Last Donation</span><span className="admin-detail-value">{row.last_donation_date || "Never"}</span></div>
 
                                 <div className="admin-detail-field"><span className="admin-detail-label">Emergency Contact</span><span className="admin-detail-value">{row.emergency_contact_name ? `${row.emergency_contact_name} / ${row.emergency_contact_phone}` : "—"}</span></div>
+
+                                  <div className="admin-detail-field"><span className="admin-detail-label">Staff Decision</span><span className="admin-detail-value">{row.staff_deferral_summary || "—"}</span></div>
 
                                 <div className="admin-detail-field"><span className="admin-detail-label">Submitted</span><span className="admin-detail-value">{new Date(row.created_at).toLocaleDateString()}</span></div>
 
@@ -2901,32 +3617,24 @@ export default function AdminDashboard() {
                       <td>{row.preferred_time}</td>
                       <td>{row.blood_bank}</td>
                       <td>
-                        <span className={`admin-badge-status ${row.status}`}>
-                          {row.status}
+                        <span className={`admin-badge-status ${row.status_key || normalizeAppointmentStatus(row.status)}`}>
+                          {row.status_label || getAppointmentStatusLabel(row.status)}
                         </span>
                       </td>
                       <td className="admin-td-actions">
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {row.status === 'pending' && (
+                          {(row.status_key || normalizeAppointmentStatus(row.status)) === 'pending' && (
                             <>
                               <button 
                                 className="admin-action-btn accept" 
-                                onClick={() => {
-                                  alert('Accept button clicked for: ' + row.full_name);
-                                  console.log('Accept button clicked:', row);
-                                  handleAcceptAppointment(row);
-                                }}
+                                onClick={() => openAppointmentModal(row)}
                                 title="Accept appointment"
                               >
                                 Accept
                               </button>
                               <button 
                                 className="admin-action-btn reject" 
-                                onClick={() => {
-                                  alert('Reject button clicked for: ' + row.full_name);
-                                  console.log('Reject button clicked:', row);
-                                  handleRejectAppointment(row);
-                                }}
+                                onClick={() => openRejectAppointmentModal(row)}
                                 title="Reject appointment"
                               >
                                 Reject
@@ -2966,8 +3674,8 @@ export default function AdminDashboard() {
                   {camps.map((row) => (
                     <tr key={row.id}>
                       <td>{row.id}</td>
-                      <td>{row.organization_name}</td>
-                      <td>{row.preferred_date}</td>
+                      <td>{row.organization_name || 'N/A'}</td>
+                      <td>{row.preferred_date || 'N/A'}</td>
                       <td>
                         <span className={`admin-badge-status ${row.status}`}>
                           {row.status}
@@ -2979,14 +3687,23 @@ export default function AdminDashboard() {
                             <>
                               <button 
                                 className="admin-action-btn accept" 
-                                onClick={() => handleAcceptCamp(row)}
-                                title="Accept camp request"
+                                onClick={() => openCampModal(row)}
+                                title="Review and accept camp request"
                               >
                                 Accept
                               </button>
                               <button 
                                 className="admin-action-btn reject" 
-                                onClick={() => handleRejectCamp(row)}
+                                onClick={() => {
+                                  setConfirmationModal({
+                                    isOpen: true,
+                                    title: 'Reject Camp Request',
+                                    message: `Are you sure you want to reject the camp request from ${row.organization_name}? This action cannot be undone.`,
+                                    onConfirm: () => handleRejectCamp(row),
+                                    type: 'danger',
+                                    isLoading: false
+                                  });
+                                }}
                                 title="Reject camp request"
                               >
                                 Reject
@@ -2995,7 +3712,7 @@ export default function AdminDashboard() {
                           )}
                           <button 
                             className="admin-action-btn view" 
-                            onClick={() => handleViewCamp(row)}
+                            onClick={() => openCampModal(row)}
                             title="View camp details"
                           >
                             View
@@ -3066,6 +3783,61 @@ export default function AdminDashboard() {
                   <input value={bankForm.longitude} onChange={(e) => setBankForm((prev) => ({ ...prev, longitude: e.target.value }))} placeholder="Longitude" />
 
                   <input value={bankForm.servicesText} onChange={(e) => setBankForm((prev) => ({ ...prev, servicesText: e.target.value }))} placeholder="Blood Donation, Testing" />
+
+                  <div className="admin-bb-inventory" style={{ gridColumn: '1 / -1', marginTop: 8 }}>
+                    <label>🩸 Blood Inventory</label>
+                    <div className="admin-inventory-components">
+                      {['Whole Blood', 'PRBC', 'Platelets', 'Plasma'].map((component) => (
+                        <div key={component} className="admin-inventory-component">
+                          <h5>{component}</h5>
+                          <table className="admin-inventory-table">
+                            <thead>
+                              <tr>
+                                <th>Blood Type</th>
+                                <th>Current Units</th>
+                                <th>Min Threshold</th>
+                                <th>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {BLOOD_GROUP_OPTIONS.map((bt) => {
+                                const row = bankForm.inventory && bankForm.inventory[component] && bankForm.inventory[component][bt]
+                                  ? bankForm.inventory[component][bt]
+                                  : { units: 0, min: 5 };
+                                const units = Number(row.units || 0);
+                                const min = Number(row.min || 0);
+                                const status = units < min ? 'LOW 🔴' : (units >= Math.ceil(min * 1.5) ? 'Healthy' : 'Watch');
+                                return (
+                                  <tr key={bt}>
+                                    <td>{bt}</td>
+                                    <td>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={units}
+                                        onChange={(e) => updateInventoryField(component, bt, 'units', Number(e.target.value || 0))}
+                                      />
+                                    </td>
+                                    <td>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={min}
+                                        onChange={(e) => updateInventoryField(component, bt, 'min', Number(e.target.value || 0))}
+                                      />
+                                    </td>
+                                    <td className={`admin-inventory-status ${status.startsWith('LOW') ? 'low' : (status === 'Healthy' ? 'healthy' : 'watch')}`}>
+                                      {status}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
                   <div className="admin-bb-types">
 
@@ -3170,6 +3942,7 @@ export default function AdminDashboard() {
                         <th>#</th>
                         <th>Name</th>
                         <th>Dzongkhag</th>
+                        <th>Inventory</th>
                         <th>Phone</th>
                         <th>Coordinates</th>
                         <th>Status</th>
@@ -3181,11 +3954,13 @@ export default function AdminDashboard() {
                         const status = String(bank.status || "active").toLowerCase();
                         const isActive = status === "active";
                         const coordText = bank.latitude != null && bank.longitude != null ? `${bank.latitude}, ${bank.longitude}` : "Not set";
+                        const inventoryTotal = getInventoryTotalUnits(bank.inventory);
                         return (
                           <tr key={bank.id} className={archiveTarget === bank.id ? "admin-row-archived" : ""}>
                             <td className="admin-td-id">{bank.id}</td>
                             <td className="admin-td-name">{bank.name}</td>
                             <td>{bank.dzongkhag || "—"}</td>
+                            <td>{inventoryTotal} units</td>
                             <td>{bank.phone || "—"}</td>
                             <td>{coordText}</td>
                             <td>
@@ -3247,10 +4022,100 @@ export default function AdminDashboard() {
         isOpen={detailsModal.isOpen}
         type={detailsModal.type}
         data={detailsModal.data}
+        onAppointmentAction={handleAppointmentDetailsAction}
         onClose={() => setDetailsModal({ isOpen: false, type: null, data: null })}
       />
 
-      
+      {/* Accept Appointment Modal */}
+      {appointmentModal.open && (
+        <div className="admin-modal-backdrop" onClick={closeAppointmentModal}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <div className="admin-modal-header">
+              <h2>Save & Accept Appointment</h2>
+              <button className="admin-modal-close" onClick={closeAppointmentModal}>×</button>
+            </div>
+            <div className="admin-modal-body">
+              <div className="modal-form-group">
+                <label htmlFor="appointment-date">Preferred Date</label>
+                <input
+                  id="appointment-date"
+                  type="date"
+                  className="admin-input"
+                  value={appointmentModal.preferred_date}
+                  onChange={(e) => setAppointmentModal({ ...appointmentModal, preferred_date: e.target.value })}
+                />
+              </div>
+              <div className="modal-form-group">
+                <label htmlFor="appointment-time">Preferred Time</label>
+                <input
+                  id="appointment-time"
+                  type="time"
+                  className="admin-input"
+                  value={appointmentModal.preferred_time}
+                  onChange={(e) => setAppointmentModal({ ...appointmentModal, preferred_time: e.target.value })}
+                />
+              </div>
+              <div className="modal-form-group">
+                <label htmlFor="appointment-bank">Blood Bank (optional)</label>
+                <select
+                  id="appointment-bank"
+                  className="admin-select"
+                  value={appointmentModal.blood_bank}
+                  onChange={(e) => setAppointmentModal({ ...appointmentModal, blood_bank: e.target.value })}
+                >
+                  <option value="">Select blood bank</option>
+                  {appointmentModal.blood_bank && Array.isArray(bloodBanks) && !bloodBanks.some((bank) => bank.name === appointmentModal.blood_bank) && (
+                    <option value={appointmentModal.blood_bank}>Current: {appointmentModal.blood_bank}</option>
+                  )}
+                  {Array.isArray(bloodBanks) && bloodBanks.map((bank) => (
+                    <option key={bank.id} value={bank.name}>{bank.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="modal-form-group">
+                <label htmlFor="appointment-notes">Notes (optional)</label>
+                <textarea
+                  id="appointment-notes"
+                  className="admin-textarea"
+                  rows={4}
+                  value={appointmentModal.notes}
+                  onChange={(e) => setAppointmentModal({ ...appointmentModal, notes: e.target.value })}
+                  placeholder="Any special instructions or donor notes"
+                />
+              </div>
+            </div>
+            <div className="admin-modal-footer">
+              <button className="btn-cancel" onClick={closeAppointmentModal} disabled={savingAppointment}>Cancel</button>
+              <button className="btn-submit" onClick={handleSaveAndAcceptAppointment} disabled={savingAppointment}>
+                {savingAppointment ? 'Saving...' : 'Save & Accept'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Appointment Modal */}
+      {rejectAppointmentModal.open && (
+        <div className="admin-modal-backdrop" onClick={closeRejectAppointmentModal}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="admin-modal-header">
+              <h2>Reject Appointment</h2>
+              <button className="admin-modal-close" onClick={closeRejectAppointmentModal}>×</button>
+            </div>
+            <div className="admin-modal-body">
+              <p>Are you sure you want to reject the appointment for <strong>{rejectAppointmentModal.appointment?.full_name}</strong>?</p>
+              <p>This will update the appointment status to rejected and notify the donor.</p>
+            </div>
+            <div className="admin-modal-footer">
+              <button className="btn-cancel" onClick={closeRejectAppointmentModal} disabled={savingAppointment}>Cancel</button>
+              <button className="btn-submit" onClick={handleConfirmRejectAppointment} disabled={savingAppointment}>
+                {savingAppointment ? 'Processing...' : 'Confirm Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Defer Temporary Modal */}
 
       {approveModal.open && (
@@ -3395,11 +4260,31 @@ export default function AdminDashboard() {
 
                       name="deferPeriod"
 
+                      value="3"
+
+                      checked={deferTemporaryModal.months === 3}
+
+                      onChange={() => handleTemporaryDeferralMonthsChange(3)}
+
+                    />
+
+                    <span>3 months</span>
+
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+
+                    <input
+
+                      type="radio"
+
+                      name="deferPeriod"
+
                       value="6"
 
                       checked={deferTemporaryModal.months === 6}
 
-                      onChange={(e) => setDeferTemporaryModal({ ...deferTemporaryModal, months: 6 })}
+                      onChange={() => handleTemporaryDeferralMonthsChange(6)}
 
                     />
 
@@ -3419,7 +4304,7 @@ export default function AdminDashboard() {
 
                       checked={deferTemporaryModal.months === 12}
 
-                      onChange={(e) => setDeferTemporaryModal({ ...deferTemporaryModal, months: 12 })}
+                      onChange={() => handleTemporaryDeferralMonthsChange(12)}
 
                     />
 
@@ -3892,6 +4777,31 @@ export default function AdminDashboard() {
         </div>
 
       )}
+
+      {/* Camp Request Modal */}
+      <CampRequestModal 
+        isOpen={campModal.open}
+        onClose={closeCampModal}
+        camp={campModal.camp}
+        onAccept={handleAcceptCamp}
+        onReject={handleRejectCamp}
+        isLoading={campModal.isLoading}
+        onRefresh={refreshCampModal}
+        onSave={handleSaveCampChanges}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        onConfirm={confirmationModal.onConfirm}
+        onCancel={() => setConfirmationModal({ isOpen: false, title: '', message: '', onConfirm: null, type: 'warning', isLoading: false })}
+        confirmText="Reject"
+        cancelText="Cancel"
+        type={confirmationModal.type}
+        isLoading={confirmationModal.isLoading}
+      />
       </div>
     </AdminShell>
   );

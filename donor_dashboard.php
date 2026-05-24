@@ -54,8 +54,107 @@ function columnExists(PDO $pdo, string $table, string $column): bool
     }
 }
 
+function appointmentStatusLabel(?string $status): string
+{
+  $normalized = strtolower(trim((string)$status));
+
+  return match ($normalized) {
+    'completed' => 'Completed',
+    'cancelled', 'canceled', 'rejected' => 'Cancelled',
+    'deferred', 'temporarily_deferred', 'permanently_deferred' => 'Deferred',
+    'confirmed' => 'Confirmed',
+    'pending' => 'Pending',
+    default => $normalized !== '' ? ucwords(str_replace(['_', '-'], ' ', $normalized)) : 'Pending',
+  };
+}
+
+function appointmentStatusClass(?string $status): string
+{
+  $normalized = strtolower(trim((string)$status));
+
+  return match ($normalized) {
+    'completed' => 'status-completed',
+    'cancelled', 'canceled', 'rejected' => 'status-cancelled',
+    'deferred', 'temporarily_deferred', 'permanently_deferred' => 'status-deferred',
+    'confirmed' => 'status-confirmed',
+    default => 'status-pending',
+  };
+}
+
+function pickAppointmentTable(PDO $pdo): ?string
+{
+  foreach (['tblappointments', 'appointments'] as $table) {
+    if (tableExists($pdo, $table)) {
+      return $table;
+    }
+  }
+
+  return null;
+}
+
+function loadCompletedDonationHistory(PDO $pdo, string $donorName, int $donorId): array
+{
+  $donationRows = [];
+
+  if (tableExists($pdo, 'donation_history')) {
+    $dateColumn = columnExists($pdo, 'donation_history', 'donation_date') ? 'donation_date' : (columnExists($pdo, 'donation_history', 'created_at') ? 'created_at' : 'id');
+    $hasDonorId = columnExists($pdo, 'donation_history', 'donor_id');
+    $hasDonorName = columnExists($pdo, 'donation_history', 'donor_name');
+
+    if ($hasDonorId) {
+      $query = 'SELECT id, ' . $dateColumn . ' AS donation_date, blood_type, component, units_collected, status FROM donation_history WHERE donor_id = :donor_id';
+      if (columnExists($pdo, 'donation_history', 'status')) {
+        $query .= " AND LOWER(COALESCE(status, '')) = 'completed'";
+      }
+      $query .= ' ORDER BY ' . $dateColumn . ' DESC, id DESC';
+      $stmt = $pdo->prepare($query);
+      $stmt->execute([':donor_id' => $donorId]);
+      $donationRows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } elseif ($hasDonorName) {
+      $query = 'SELECT id, ' . $dateColumn . ' AS donation_date, blood_type, component, units_collected, status FROM donation_history WHERE donor_name = :donor_name';
+      if (columnExists($pdo, 'donation_history', 'status')) {
+        $query .= " AND LOWER(COALESCE(status, '')) = 'completed'";
+      }
+      $query .= ' ORDER BY ' . $dateColumn . ' DESC, id DESC';
+      $stmt = $pdo->prepare($query);
+      $stmt->execute([':donor_name' => $donorName]);
+      $donationRows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+  }
+
+  if (empty($donationRows) && tableExists($pdo, 'tbldonations')) {
+    $dateColumn = columnExists($pdo, 'tbldonations', 'donation_date') ? 'donation_date' : (columnExists($pdo, 'tbldonations', 'created_at') ? 'created_at' : 'id');
+    $statusFilter = columnExists($pdo, 'tbldonations', 'status') ? " AND LOWER(COALESCE(status, '')) IN ('safe', 'stocked')" : '';
+
+    if (columnExists($pdo, 'tbldonations', 'donor_id')) {
+      $stmt = $pdo->prepare('SELECT id, ' . $dateColumn . ' AS donation_date, blood_type, component, units_collected AS units, status FROM tbldonations WHERE donor_id = :donor_id' . $statusFilter . ' ORDER BY ' . $dateColumn . ' DESC, id DESC');
+      $stmt->execute([':donor_id' => $donorId]);
+      $donationRows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } elseif (columnExists($pdo, 'tbldonations', 'donor_name')) {
+      $stmt = $pdo->prepare('SELECT id, ' . $dateColumn . ' AS donation_date, blood_type, component, units_collected AS units, status FROM tbldonations WHERE donor_name = :donor_name' . $statusFilter . ' ORDER BY ' . $dateColumn . ' DESC, id DESC');
+      $stmt->execute([':donor_name' => $donorName]);
+      $donationRows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+  }
+
+  $normalized = [];
+  foreach ($donationRows as $row) {
+    $normalized[] = [
+      'id' => $row['id'] ?? null,
+      'donation_date' => $row['donation_date'] ?? null,
+      'blood_type' => $row['blood_type'] ?? '',
+      'component' => $row['component'] ?? 'Whole Blood',
+      'units' => isset($row['units_collected']) ? (int)$row['units_collected'] : (int)($row['units'] ?? 1),
+      'status' => 'Completed',
+    ];
+  }
+
+  return $normalized;
+}
+
 $donor = null;
 $linkedUserId = null;
+$appointmentHistory = [];
 $upcomingAppointments = [];
 $pastDonations = [];
 $bloodRequests = [];
@@ -81,83 +180,62 @@ try {
     $user = $userStmt->fetch(PDO::FETCH_ASSOC);
     $linkedUserId = $user ? (int)$user['id'] : null;
 
-    // 1) Upcoming appointments (own records)
-    if ($linkedUserId !== null) {
+    // 1) Appointment history (own records)
+    $appointmentTable = pickAppointmentTable($pdo);
+    if ($appointmentTable !== null) {
+      $hasUserIdColumn = columnExists($pdo, $appointmentTable, 'user_id');
+      $hasFullNameColumn = columnExists($pdo, $appointmentTable, 'full_name');
+
+      if ($linkedUserId !== null && $hasUserIdColumn) {
         $apptStmt = $pdo->prepare(
-            'SELECT id, preferred_date, preferred_time, blood_bank, blood_group, status
-             FROM appointments
-             WHERE user_id = :user_id
-             ORDER BY preferred_date ASC, preferred_time ASC'
+          'SELECT id, preferred_date, preferred_time, blood_bank, blood_group, status
+           FROM `' . str_replace('`', '``', $appointmentTable) . '` 
+           WHERE user_id = :user_id
+         ORDER BY preferred_date DESC, preferred_time DESC'
         );
         $apptStmt->execute([':user_id' => $linkedUserId]);
-    } else {
+      } elseif ($hasFullNameColumn) {
         // Fallback for older data where user_id may not be linked yet.
         $apptStmt = $pdo->prepare(
-            'SELECT id, preferred_date, preferred_time, blood_bank, blood_group, status
-             FROM appointments
-             WHERE full_name = :full_name
-             ORDER BY preferred_date ASC, preferred_time ASC'
+          'SELECT id, preferred_date, preferred_time, blood_bank, blood_group, status
+           FROM `' . str_replace('`', '``', $appointmentTable) . '` 
+           WHERE full_name = :full_name
+         ORDER BY preferred_date DESC, preferred_time DESC'
         );
         $apptStmt->execute([':full_name' => (string)$donor['full_name']]);
+      } else {
+        $appointmentHistory = [];
+      }
     }
 
-    $allAppointments = $apptStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $appointmentHistory = isset($apptStmt) ? ($apptStmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
     $today = new DateTimeImmutable('today');
 
-    foreach ($allAppointments as $row) {
+    foreach ($appointmentHistory as $row) {
         $date = DateTimeImmutable::createFromFormat('Y-m-d', (string)$row['preferred_date']);
-        if ($date && $date >= $today && ($row['status'] ?? '') !== 'rejected') {
+      $statusValue = strtolower((string)($row['status'] ?? ''));
+      if ($date && $date >= $today && !in_array($statusValue, ['rejected', 'cancelled', 'completed', 'deferred'], true)) {
             $upcomingAppointments[] = $row;
         }
     }
 
-    // 2) Past donations (tbldonations if exists, otherwise fallback)
-    if (tableExists($pdo, 'tbldonations')) {
-        $donationDateCol = columnExists($pdo, 'tbldonations', 'donation_date') ? 'donation_date' : (columnExists($pdo, 'tbldonations', 'created_at') ? 'created_at' : 'NULL');
-        $unitsCol = columnExists($pdo, 'tbldonations', 'units') ? 'units' : 'NULL';
-        $statusCol = columnExists($pdo, 'tbldonations', 'status') ? 'status' : 'NULL';
-        $bloodTypeCol = columnExists($pdo, 'tbldonations', 'blood_type') ? 'blood_type' : 'NULL';
+    // 2) Completed donations only
+    $pastDonations = loadCompletedDonationHistory($pdo, (string)$donor['full_name'], $donorId);
+    $latestDonationRow = $pastDonations[0] ?? null;
+    $lastDonationDisplay = 'Never';
+    $nextEligibleDisplay = 'N/A';
 
-        if (columnExists($pdo, 'tbldonations', 'donor_id')) {
-            $donationSql =
-                'SELECT id, ' . $donationDateCol . ' AS donation_date, ' . $bloodTypeCol . ' AS blood_type, ' . $unitsCol . ' AS units, ' . $statusCol . ' AS status
-                 FROM tbldonations
-                 WHERE donor_id = :donor_id
-                 ORDER BY donation_date DESC';
-            $donationStmt = $pdo->prepare($donationSql);
-            $donationStmt->execute([':donor_id' => $donorId]);
-            $pastDonations = $donationStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        } elseif (columnExists($pdo, 'tbldonations', 'donor_name')) {
-            $donationSql =
-                'SELECT id, ' . $donationDateCol . ' AS donation_date, ' . $bloodTypeCol . ' AS blood_type, ' . $unitsCol . ' AS units, ' . $statusCol . ' AS status
-                 FROM tbldonations
-                 WHERE donor_name = :donor_name
-                 ORDER BY donation_date DESC';
-            $donationStmt = $pdo->prepare($donationSql);
-            $donationStmt->execute([':donor_name' => (string)$donor['full_name']]);
-            $pastDonations = $donationStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        }
-    } else {
-        // Fallback for this project schema: use donor's last donation date as a minimal history row.
-        if (!empty($donor['created_at'])) {
-            $pastDonations[] = [
-                'id' => null,
-                'donation_date' => $donor['created_at'],
-                'blood_type' => $donor['blood_type'] ?? null,
-                'units' => null,
-                'status' => 'Registered donor',
-            ];
-        }
-        if (!empty($donor['last_donation_date'])) {
-            array_unshift($pastDonations, [
-                'id' => null,
-                'donation_date' => $donor['last_donation_date'],
-                'blood_type' => $donor['blood_type'] ?? null,
-                'units' => null,
-                'status' => 'Donation date reported',
-            ]);
-        }
+    if ($latestDonationRow && !empty($latestDonationRow['donation_date'])) {
+      $latestDonationDate = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string)$latestDonationRow['donation_date'])
+        ?: DateTimeImmutable::createFromFormat('Y-m-d', substr((string)$latestDonationRow['donation_date'], 0, 10));
+      if ($latestDonationDate) {
+        $lastDonationDisplay = $latestDonationDate->format('d M Y');
+        $nextEligibleDisplay = $latestDonationDate->modify('+90 days')->format('d M Y');
+      }
     }
+
+    $totalAppointments = count($appointmentHistory);
+    $totalDonations = count($pastDonations);
 
     // 3) Blood requests by donor_id if present, otherwise by patient_name
     if (tableExists($pdo, 'tblblood_requests')) {
@@ -216,6 +294,10 @@ if (!$donor) {
 $status = strtolower((string)($donor['status'] ?? 'pending'));
 $isPending = $status === 'pending';
 $isDeferred = ((int)($donor['deferred'] ?? 0) === 1);
+$totalAppointments = $totalAppointments ?? 0;
+$totalDonations = $totalDonations ?? 0;
+$lastDonationDisplay = $lastDonationDisplay ?? 'Never';
+$nextEligibleDisplay = $nextEligibleDisplay ?? 'N/A';
 ?>
 <!doctype html>
 <html lang="en">
@@ -365,11 +447,28 @@ $isDeferred = ((int)($donor['deferred'] ?? 0) === 1);
 
     .notif p { margin: 0; color: #374151; }
     .muted { color: var(--muted); font-size: 0.82rem; margin-top: 6px; display: inline-block; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .summary-card { background: linear-gradient(180deg, #fff, #fff8f1); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: 0 10px 28px rgba(31, 41, 55, 0.05); }
+    .summary-card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .summary-card .value { font-size: 28px; font-weight: 800; color: var(--accent); margin-top: 8px; }
+    .summary-card .value.small { font-size: 20px; }
+    .status-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
+    .status-completed { background: #dcfce7; color: #166534; }
+    .status-cancelled { background: #fee2e2; color: #991b1b; }
+    .status-deferred { background: #fef3c7; color: #92400e; }
+    .status-confirmed { background: #dbeafe; color: #1d4ed8; }
+    .status-pending { background: #e5e7eb; color: #374151; }
+    .table-wrap { overflow: auto; }
 
     @media (max-width: 900px) {
       .span-4, .span-8, .span-12 { grid-column: span 12; }
       .meta { grid-template-columns: 1fr; }
       .top { flex-direction: column; align-items: flex-start; }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 720px) {
+      .summary-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -402,6 +501,28 @@ $isDeferred = ((int)($donor['deferred'] ?? 0) === 1);
       </div>
     <?php endif; ?>
 
+    <div class="card" style="margin-bottom: 16px;">
+      <h2>Donation Activity</h2>
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="label">Total Donations</div>
+          <div class="value"><?php echo e((string)$totalDonations); ?></div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Total Appointments</div>
+          <div class="value"><?php echo e((string)$totalAppointments); ?></div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Last Donation</div>
+          <div class="value small"><?php echo e((string)$lastDonationDisplay); ?></div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Next Eligible</div>
+          <div class="value small"><?php echo e((string)$nextEligibleDisplay); ?></div>
+        </div>
+      </div>
+    </div>
+
     <div class="grid">
       <section class="card span-4">
         <h2>Basic Donor Info</h2>
@@ -414,10 +535,11 @@ $isDeferred = ((int)($donor['deferred'] ?? 0) === 1);
       </section>
 
       <section class="card span-8">
-        <h2>Upcoming Appointments</h2>
-        <?php if (empty($upcomingAppointments)): ?>
-          <p class="empty">No upcoming appointments found.</p>
+        <h2>Appointment History</h2>
+        <?php if (empty($appointmentHistory)): ?>
+          <p class="empty">No appointment history found.</p>
         <?php else: ?>
+          <div class="table-wrap">
           <table>
             <thead>
               <tr>
@@ -430,26 +552,28 @@ $isDeferred = ((int)($donor['deferred'] ?? 0) === 1);
               </tr>
             </thead>
             <tbody>
-              <?php foreach ($upcomingAppointments as $row): ?>
+              <?php foreach ($appointmentHistory as $row): ?>
                 <tr>
                   <td><?php echo e((string)$row['id']); ?></td>
                   <td><?php echo e((string)$row['preferred_date']); ?></td>
                   <td><?php echo e((string)($row['preferred_time'] ?? '—')); ?></td>
                   <td><?php echo e((string)($row['blood_bank'] ?? '—')); ?></td>
                   <td><?php echo e((string)($row['blood_group'] ?? '—')); ?></td>
-                  <td><?php echo e(ucfirst((string)($row['status'] ?? 'pending'))); ?></td>
+                  <td><span class="status-badge <?php echo e(appointmentStatusClass((string)($row['status'] ?? 'pending'))); ?>"><?php echo e(appointmentStatusLabel((string)($row['status'] ?? 'pending'))); ?></span></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
           </table>
+          </div>
         <?php endif; ?>
       </section>
 
       <section class="card span-12">
-        <h2>Past Donations</h2>
+        <h2>Completed Donations</h2>
         <?php if (empty($pastDonations)): ?>
-          <p class="empty">No past donations found.</p>
+          <p class="empty">No completed donations found.</p>
         <?php else: ?>
+          <div class="table-wrap">
           <table>
             <thead>
               <tr>
@@ -467,11 +591,12 @@ $isDeferred = ((int)($donor['deferred'] ?? 0) === 1);
                   <td><?php echo e((string)($row['donation_date'] ?? '—')); ?></td>
                   <td><?php echo e((string)($row['blood_type'] ?? '—')); ?></td>
                   <td><?php echo e((string)($row['units'] ?? '—')); ?></td>
-                  <td><?php echo e((string)($row['status'] ?? '—')); ?></td>
+                  <td><span class="status-badge status-completed">Completed</span></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
           </table>
+          </div>
         <?php endif; ?>
       </section>
 
