@@ -1,4 +1,7 @@
 import React from "react";
+import { toast } from "react-toastify";
+import { certificateFromDonor, openCertificateWindow } from "../../utils/certificateTemplate";
+import { getStoredUser } from "../../utils/auth";
 
 // Map numeric status codes and string variations to normalized values
 const normalizeStatus = (status) => {
@@ -264,7 +267,14 @@ export default function DonorDetailsPanel({ open, loading, error, donor, onClose
               </section>
               {/* Footer actions: Generate Certificate, View ID Card, Export History */}
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-start', alignItems: 'center', paddingTop: 8 }}>
-                <button className="inline-flex items-center rounded-md px-4 py-2" style={{ background: '#b31622', color: '#fff', borderRadius: 10, padding: '10px 16px', fontWeight: 800 }} onClick={() => { /* certificate logic may already exist elsewhere */ window.print(); }}>
+                <button className="inline-flex items-center rounded-md px-4 py-2" style={{ background: '#b31622', color: '#fff', borderRadius: 10, padding: '10px 16px', fontWeight: 800 }} onClick={() => {
+                  if (!donor) return;
+                  const me = getStoredUser();
+                  const certificate = certificateFromDonor(donor, { name: me?.name, role: me?.role });
+                  if (!openCertificateWindow(certificate)) {
+                    toast.error("Popup blocked. Please allow popups for this site to view the certificate.");
+                  }
+                }}>
                   Generate Certificate
                 </button>
                 <button className="inline-flex items-center rounded-md px-4 py-2" style={{ background: '#fff', border: '1px solid #e5e7eb', color: '#7f1d1d', fontWeight: 800, padding: '10px 16px', borderRadius: 10 }} onClick={openCardPreview}>

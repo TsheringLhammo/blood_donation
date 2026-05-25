@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { toast } from "react-toastify";
 
@@ -24,18 +24,39 @@ import ConfirmationModal from "../components/ConfirmationModal";
 
 import DonorRecordsPanel from "../components/admin/DonorRecordsPanel";
 import DonationHistoryPanel from "../components/admin/DonationHistoryPanel";
+import CertificatesPanel from "../components/admin/CertificatesPanel";
+
+const VIEW_HEADERS = {
+  dashboard: { title: "Dashboard", subtitle: "Overview of donors, appointments, and blood bank activity" },
+  appointments: { title: "Appointments", subtitle: "Review, accept, and manage scheduled donor appointments" },
+  donors: { title: "Donors", subtitle: "Registered donors and pending applications" },
+  donorRecords: { title: "Donor Records", subtitle: "Search, filter, preview, export, and update registered donor records" },
+  donationHistory: { title: "Donation History", subtitle: "View and manage all donation events" },
+  certificates: { title: "Certificates", subtitle: "Generate appreciation letters and certificates based on donation milestones" },
+  donorCards: { title: "Donor Cards", subtitle: "Digital donor ID cards with QR code, print, and PDF download" },
+  bloodBanks: { title: "Blood Banks", subtitle: "Active blood banks across the system" },
+  camps: { title: "Camp Requests", subtitle: "Review and respond to blood donation camp requests" },
+};
 
 
 
 export default function AdminDashboard() {
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const bankFormRef = useRef(null);
 
   const [user, setUser] = useState(null);
 
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(location.state?.tab || "dashboard");
+
+  useEffect(() => {
+    const requested = location.state?.tab;
+    if (requested && VIEW_HEADERS[requested]) {
+      setActiveTab(requested);
+    }
+  }, [location.state]);
 
 
 
@@ -2958,15 +2979,17 @@ export default function AdminDashboard() {
 
   const links = [
 
-    { to: "/blood-banks", icon: "🏥", label: "Blood Banks", desc: "Search and manage locations" },
+    { tab: "bloodBanks", icon: "🏥", label: "Blood Banks", desc: "Manage blood bank locations" },
 
-    { to: "/donating-blood", icon: "📋", label: "Book Appointment", desc: "Create and manage donor appointments" },
+    { tab: "appointments", icon: "📅", label: "Appointments", desc: "Review scheduled donor appointments" },
 
-    { to: "/camp", icon: "🏕️", label: "Camp Form", desc: "Register donation camp" },
+    { tab: "camps", icon: "🏕️", label: "Camp Requests", desc: "Approve donation camp requests" },
 
-    { to: "/register", icon: "👤", label: "Donor Register", desc: "Add new donor profile" },
+    { tab: "donors", icon: "👤", label: "Donors", desc: "Pending approvals and donor workflow" },
 
-    { to: "/", icon: "🏠", label: "Back to Home", desc: "Return to public site" },
+    { tab: "donationHistory", icon: "📜", label: "Donation History", desc: "View all completed donations" },
+
+    { to: "/", icon: "🏠", label: "Public Site", desc: "Return to public homepage" },
 
   ];
 
@@ -3054,6 +3077,10 @@ export default function AdminDashboard() {
       return <DonationHistoryPanel embedded />;
     }
 
+    if (key === "certificates") {
+      return <CertificatesPanel embedded />;
+    }
+
     return (
       <div className="admin-dashboard-grid">
         <article className="admin-panel-card admin-panel-wide">
@@ -3115,10 +3142,74 @@ export default function AdminDashboard() {
     );
   };
 
+  const exportCampsExcel = (rows) => {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      toast.info("No camp requests to export.");
+      return;
+    }
+    const headers = [
+      "ID",
+      "Organization",
+      "Contact Person",
+      "Phone",
+      "Email",
+      "Dzongkhag",
+      "Camp Type",
+      "Venue / Address",
+      "Preferred Date",
+      "Alternate Date",
+      "Expected Donors",
+      "Facilities Available",
+      "Additional Info",
+      "Status",
+      "Submitted At",
+    ];
+    const escape = (value) => {
+      const str = String(value ?? "").replace(/"/g, '""');
+      return `"${str}"`;
+    };
+    const body = rows.map((row) => [
+      row.id,
+      row.organization_name,
+      row.contact_person,
+      row.phone_number,
+      row.email,
+      row.dzongkhag,
+      row.camp_type,
+      row.venue_address,
+      row.preferred_date,
+      row.alternate_date,
+      row.expected_donors,
+      row.facilities_available,
+      row.additional_info,
+      row.status,
+      row.created_at,
+    ].map(escape).join(","));
+    // BOM helps Excel detect UTF-8 properly.
+    const csv = "﻿" + [headers.map(escape).join(","), ...body].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `camp-requests-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} camp request${rows.length === 1 ? "" : "s"}.`);
+  };
+
 
 
   return (
-    <AdminShell user={user} onLogout={handleLogout} activeView={activeTab} onChangeView={setActiveTab}>
+    <AdminShell
+      user={user}
+      onLogout={handleLogout}
+      activeView={activeTab}
+      onChangeView={setActiveTab}
+      title={VIEW_HEADERS[activeTab]?.title || ""}
+      subtitle={VIEW_HEADERS[activeTab]?.subtitle || ""}
+    >
       <div className="admin-dashboard">
       <div className="admin-page">
         {bannerToast ? <div className={`admin-toast ${bannerToast.type}`}>{bannerToast.message}</div> : null}
@@ -3266,9 +3357,29 @@ export default function AdminDashboard() {
 
                 <div className="admin-quick-grid">
 
-                  {links.map((link, i) => (
+                  {links.map((link) => link.tab ? (
 
-                    <Link to={link.to} key={i} className="admin-quick-card">
+                    <button
+                      type="button"
+                      key={link.tab}
+                      className="admin-quick-card"
+                      onClick={() => {
+                        setActiveTab(link.tab);
+                        if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    >
+
+                      <span className="admin-quick-icon">{link.icon}</span>
+
+                      <div><h4>{link.label}</h4><p>{link.desc}</p></div>
+
+                      <span className="admin-link-arrow">→</span>
+
+                    </button>
+
+                  ) : (
+
+                    <Link to={link.to} key={link.to} className="admin-quick-card">
 
                       <span className="admin-quick-icon">{link.icon}</span>
 
@@ -3666,6 +3777,22 @@ export default function AdminDashboard() {
           {activeTab === "camps" && (
 
             <div className="admin-table-wrap">
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 4px 12px", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ color: "#6b7280", fontSize: 13 }}>
+                  {camps && camps.length > 0 ? `${camps.length} camp request${camps.length === 1 ? "" : "s"}` : ""}
+                </div>
+                <button
+                  type="button"
+                  className="admin-action-btn"
+                  style={{ background: "#107c41", color: "#fff", border: 0, padding: "8px 14px", borderRadius: 8, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6 }}
+                  disabled={!camps || camps.length === 0}
+                  onClick={() => exportCampsExcel(camps)}
+                  title="Download all camp requests as an Excel-compatible CSV"
+                >
+                  ⬇ Export Excel
+                </button>
+              </div>
 
               {loadingCamps ? <div className="admin-table-msg">Loading camps…</div> : errorCamps ? <div className="admin-table-msg error">{errorCamps}</div> : !camps || camps.length === 0 ? <div className="admin-table-msg">No camps found.</div> : (
 

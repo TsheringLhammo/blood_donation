@@ -6,8 +6,12 @@ import { titleCase } from "../utils/strings";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
+// Relative paths so the React dev server's proxy (configured for the
+// PHP backend, port 8080 via docker) handles them. Falling back through
+// the few legacy locations the register endpoint has lived at.
 const DEFAULT_API_URLS = [
-  "http://localhost/blood_donation/backend/api/register_donor.php",
+  "/blood_donation/backend/api/register_donor.php",
+  "/blood_donation/api/register_donor.php",
 ];
 
 const getCandidateApiUrls = () => {
@@ -186,8 +190,9 @@ export default function DonorRegister() {
       showPopup("Invalid Phone Number", "Use 8 digits starting with 16, 17, or 77.");
       return;
     }
-    if (Number(formData.weight) < 45) {
-      showPopup("Invalid Weight", "Weight must be at least 45 kg.");
+    const weightNumber = Number(formData.weight);
+    if (!Number.isFinite(weightNumber) || weightNumber < 45 || weightNumber > 250) {
+      showPopup("Invalid Weight", "Weight must be between 45 and 250 kg.");
       return;
     }
     if (!isValidBhutanPhone(formData.emergencyContactPhone)) {
@@ -235,7 +240,11 @@ export default function DonorRegister() {
             parseFailure.name = "ParseError";
             throw parseFailure;
           }
-          if (!response.ok || !result.success) throw new Error(result.message || "Registration failed.");
+          if (!response.ok || !result.success) {
+            const baseMessage = result?.message || "Registration failed.";
+            const detail = result?.error ? ` (${result.error})` : "";
+            throw new Error(`${baseMessage}${detail}`);
+          }
           if (!isConfirmedInsert(response, result)) throw new Error("Server replied with an unexpected success response.");
           savedByUrl = apiUrl;
           savedId = result?.id ?? null;
@@ -372,7 +381,7 @@ export default function DonorRegister() {
                 <div className="form-group">
                   <label>Weight (kg) *</label>
                   <input type="number" name="weight" value={formData.weight}
-                    onChange={handleChange} min="45" step="0.1" placeholder="Minimum 45 kg" required />
+                    onChange={handleChange} min="45" max="250" step="0.1" placeholder="45 – 250 kg" required />
                 </div>
               </div>
 

@@ -13,16 +13,20 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { authFetch } from '../utils/auth';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { authFetch, clearAuthSession, getStoredUser } from '../utils/auth';
 import EditProfile from '../components/EditProfile';
+import DonorShell from '../components/donor/DonorShell';
 import { maskCidNumber } from '../utils/strings';
 import './DonorDashboard.css';
 
 const DonorDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [profile, setProfile] = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [donationHistory, setDonationHistory] = useState([]);
+  const [donationSummary, setDonationSummary] = useState({ total: 0, this_year: 0, units: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -34,42 +38,46 @@ const DonorDashboard = () => {
         const res = await authFetch(`get_my_profile.php?_ts=${Date.now()}`, {
           cache: 'no-store'
         });
-        if (!res.ok) throw new Error('Failed to fetch profile');
+        if (res.status === 401 || res.status === 403) {
+          clearAuthSession();
+          navigate('/login', { replace: true });
+          return;
+        }
+        if (res.status === 404) {
+          // User is authenticated but has no donor record yet.
+          setError('NO_DONOR_PROFILE');
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(`Failed to fetch profile (HTTP ${res.status})`);
+        }
         const data = await res.json();
-        
+
         if (data.success && data.data) {
-          console.log('🔍 DEBUG: Received profile from backend:', {
-            id: data.data.id,
-            status: data.data.status,
-            workflow_status: data.data.workflow_status,
-            deferred: data.data.deferred,
-            deferred_until: data.data.deferred_until,
-            deferral_reason: data.data.deferral_reason
-          });
           setProfile(data.data);
         } else {
-          setError('Could not load profile');
+          setError(data.message || 'Could not load profile');
         }
       } catch (err) {
-        setError(err.message);
+        setError(err.message || 'Could not load profile');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchProfile();
-  }, []);
+  }, [navigate]);
 
-  // Fetch appointments
+  // Fetch appointments (does not depend on tbldonors record — keyed by
+  // tblusers.id from the JWT, so it works even when profile is missing).
   useEffect(() => {
-    if (!profile) return;
-
     const fetchAppointments = async () => {
       try {
         const res = await authFetch(`get_my_appointments.php?_ts=${Date.now()}`, {
           cache: 'no-store'
         });
-        if (!res.ok) throw new Error('Failed to fetch appointments');
+        if (!res.ok) return;
         const data = await res.json();
-        
         if (data.success && Array.isArray(data.data)) {
           setAppointments(data.data);
         }
@@ -79,20 +87,67 @@ const DonorDashboard = () => {
     };
 
     fetchAppointments();
-  }, [profile]);
+  }, []);
+
+  // Smooth-scroll to the anchor whenever the hash changes AND the page is
+  // ready. Retries briefly because sections render right after the
+  // profile fetch resolves.
+  useEffect(() => {
+    if (loading) return undefined;
+    const rawHash = (location.hash || '').replace(/^#/, '');
+    if (!rawHash) return undefined;
+
+    let attempt = 0;
+    const tick = () => {
+      const el = document.getElementById(rawHash);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      attempt += 1;
+      if (attempt < 10) {
+        setTimeout(tick, 100);
+      }
+    };
+    tick();
+    return undefined;
+  }, [location.hash, loading]);
 
   useEffect(() => {
-    if (!profile) return;
-    setLoading(false);
-  }, [profile]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch(`get_my_donation_history.php?_ts=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled || !json?.success) return;
+        setDonationHistory(Array.isArray(json.data) ? json.data : []);
+        setDonationSummary(json.summary || { total: 0, this_year: 0, units: 0 });
+      } catch (_) {
+        /* ignore — history is non-critical */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   if (loading) {
-    return <div className="dashboard-loading">Loading dashboard...</div>;
+    return (
+      <DonorShell user={getStoredUser()} title="Donor Dashboard">
+        <div className="donor-dashboard">
+          <div className="dashboard-loading">Loading dashboard...</div>
+        </div>
+      </DonorShell>
+    );
   }
 
-  if (error || !profile) {
-    return <div className="dashboard-error">Error: {error || 'Profile not found'}</div>;
-  }
+  // If profile didn't load, fall back to a minimal placeholder so the rest
+  // of the dashboard layout (sidebar, top bar, sections) still renders.
+  const isMissingProfile = error === 'NO_DONOR_PROFILE';
+  const profileMissingNotice = !profile ? (
+    isMissingProfile
+      ? "Your donor profile isn't linked yet. Complete registration to unlock the full dashboard."
+      : (error || 'Unable to load profile right now.')
+  ) : null;
 
   // ========================================
   // STATUS-SPECIFIC MESSAGE AND STYLING
@@ -170,8 +225,8 @@ const DonorDashboard = () => {
       action: 'Contact Blood Bank',
       actionColor: 'danger',
       showAppointmentButton: false,
-      additionalInfo: `Your deferral reason: ${profile.deferral_reason || 'Medical hold'}`,
-      deferredUntil: profile.deferred_until
+      additionalInfo: `Your deferral reason: ${profile?.deferral_reason || 'Medical hold'}`,
+      deferredUntil: profile?.deferred_until
     },
     rejected: {
       badge: '❌ Not Approved',
@@ -195,9 +250,9 @@ const DonorDashboard = () => {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  const deferralDate = profile.deferred_until ? formatDate(profile.deferred_until) : null;
+  const deferralDate = profile?.deferred_until ? formatDate(profile.deferred_until) : null;
   const today = new Date();
-  const deferralEnd = profile.deferred_until ? new Date(profile.deferred_until) : null;
+  const deferralEnd = profile?.deferred_until ? new Date(profile.deferred_until) : null;
   const daysRemaining = deferralEnd ? Math.ceil((deferralEnd - today) / (1000 * 60 * 60 * 24)) : null;
 
   const handleSaveProfile = (updatedProfile) => {
@@ -205,10 +260,41 @@ const DonorDashboard = () => {
     setShowEditModal(false);
   };
 
+  const handleLogout = () => {
+    clearAuthSession();
+    navigate('/login', { replace: true });
+  };
+
+  const shellUser = getStoredUser();
+  const subtitleText = profile?.full_name
+    ? `Welcome back, ${profile.full_name}`
+    : 'Track your status, appointments, and updates';
+
   return (
+    <DonorShell user={shellUser} onLogout={handleLogout} title="Donor Dashboard" subtitle={subtitleText}>
     <div className="donor-dashboard">
+      {profileMissingNotice ? (
+        <div className="status-banner" style={{ borderLeft: '4px solid #c2410c', background: '#fff7ed' }}>
+          <div className="status-header">
+            <span className="status-badge" style={{ color: '#c2410c', background: '#fff', borderColor: '#c2410c' }}>
+              ⚠ Profile not linked
+            </span>
+          </div>
+          <p className="status-message" style={{ color: '#7c2d12' }}>{profileMissingNotice}</p>
+          {isMissingProfile ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ marginTop: 10 }}
+              onClick={() => navigate('/register')}
+            >
+              Complete Donor Registration
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {/* STATUS BANNER - ONLY SHOW AFTER PROFILE LOADED */}
-      {!loading && (
+      {!loading && profile && (
       <div 
         className="status-banner"
         style={{
@@ -270,61 +356,115 @@ const DonorDashboard = () => {
       <div className="profile-section">
         <div className="profile-header">
           <h2>Your Profile</h2>
-          <button className="btn btn-primary edit-profile-btn" onClick={() => setShowEditModal(true)}>
+          <button
+            className="btn btn-primary edit-profile-btn"
+            onClick={() => setShowEditModal(true)}
+            disabled={!profile}
+            title={profile ? 'Edit profile' : 'Complete registration first'}
+          >
             Edit Profile
           </button>
         </div>
         <div className="profile-grid">
           <div className="profile-item">
             <label>Name</label>
-            <value>{profile.full_name}</value>
+            <value>{profile?.full_name || (shellUser?.name || '—')}</value>
           </div>
           <div className="profile-item">
             <label>Email</label>
-            <value>{profile.email}</value>
+            <value>{profile?.email || (shellUser?.email || '—')}</value>
           </div>
             <div className="profile-item">
               <label>CID Number</label>
-              <value>{profile.cid_number_masked || maskCidNumber(profile.cid_number) || 'Not available'}</value>
+              <value>{profile?.cid_number_masked || maskCidNumber(profile?.cid_number) || 'Not available'}</value>
             </div>
           <div className="profile-item">
             <label>Blood Type</label>
-            <value>{profile.blood_type || 'Not specified'}</value>
+            <value>{profile?.blood_type || 'Not specified'}</value>
           </div>
           <div className="profile-item">
             <label>Sample Test</label>
-            <value>{profile.sample_tested || 'Pending'}</value>
+            <value>{profile?.sample_tested || 'Pending'}</value>
           </div>
         </div>
       </div>
 
       {/* APPOINTMENTS */}
-      {config.showAppointmentButton && appointments.length > 0 && (
-        <div className="appointments-section">
-          <h2>Your Appointments</h2>
+      <div id="appointments" className="appointments-section">
+        <h2>Your Appointments</h2>
+        {appointments.length === 0 ? (
+          <p className="dh-empty-text">No appointments yet.</p>
+        ) : (
           <div className="appointments-list">
-            {appointments.map((apt) => (
-              <div key={apt.id} className="appointment-card">
-                <div className="appointment-date">
-                  📅 {formatDate(apt.appointment_date)} at {apt.appointment_time}
+            {appointments.map((apt) => {
+              const aptDate = apt.appointment_date || apt.preferred_date;
+              const aptTime = apt.appointment_time || apt.preferred_time;
+              const aptBank = apt.blood_bank_name || apt.blood_bank;
+              const aptStatus = String(apt.status || 'pending').toLowerCase();
+              return (
+                <div key={apt.id} className="appointment-card">
+                  <div className="appointment-date">
+                    📅 {formatDate(aptDate)}{aptTime ? ` at ${aptTime}` : ''}
+                  </div>
+                  <div className="appointment-location">
+                    📍 {aptBank || '—'}
+                  </div>
+                  <div className={`appointment-status status-${aptStatus}`}>
+                    {aptStatus}
+                  </div>
                 </div>
-                <div className="appointment-location">
-                  📍 {apt.blood_bank_name}
-                </div>
-                <div className={`appointment-status status-${apt.status.toLowerCase()}`}>
-                  {apt.status}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-          <button 
+        )}
+        {config.showAppointmentButton ? (
+          <button
             className="btn btn-primary"
-            onClick={() => navigate('/book-appointment')}
+            onClick={() => navigate('/donating-blood')}
+            style={{ marginTop: 12 }}
           >
-            Schedule Another Appointment
+            {appointments.length === 0 ? 'Book Appointment' : 'Schedule Another Appointment'}
           </button>
+        ) : null}
+      </div>
+
+      {/* DONATION HISTORY */}
+      <div id="history" className="appointments-section">
+        <h2>Donation History</h2>
+        <div className="dh-mini-stats">
+          <div className="dh-mini-stat"><span>Total Donations</span><strong>{donationSummary.total}</strong></div>
+          <div className="dh-mini-stat"><span>This Year</span><strong>{donationSummary.this_year}</strong></div>
+          <div className="dh-mini-stat"><span>Units Donated</span><strong>{donationSummary.units}</strong></div>
         </div>
-      )}
+        {donationHistory.length === 0 ? (
+          <p className="dh-empty-text">No completed donations yet. Once you donate, the record will appear here.</p>
+        ) : (
+          <div className="dh-mini-table-wrap">
+            <table className="dh-mini-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Blood Bank</th>
+                  <th>Component</th>
+                  <th>Units</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {donationHistory.map((row) => (
+                  <tr key={row.id}>
+                    <td>{formatDate(row.donation_date)}</td>
+                    <td>{row.blood_bank_name || `Bank #${row.blood_bank_id}`}</td>
+                    <td>{row.component || 'Whole Blood'}</td>
+                    <td>{row.units_collected}</td>
+                    <td><span className="appointment-status status-completed">{row.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* HELP SECTION */}
       <div className="help-section">
@@ -345,6 +485,7 @@ const DonorDashboard = () => {
         />
       )}
     </div>
+    </DonorShell>
   );
 };
 

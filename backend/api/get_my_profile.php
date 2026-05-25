@@ -69,9 +69,7 @@ try {
     $testResultSelect = $hasTestResultColumn ? 'test_result' : 'NULL AS test_result';
     $workflowStatusSelect = $hasWorkflowStatusColumn ? 'workflow_status' : "NULL AS workflow_status";
 
-    // Try exact email match first, then case-insensitive + trimmed email to avoid stale fallback profiles.
-    $stmt = $pdo->prepare(
-        'SELECT id, full_name, email, phone, cid_number, date_of_birth, blood_type, address, city, dzongkhag,
+    $donorSelectColumns = 'id, full_name, email, phone, cid_number, date_of_birth, blood_type, address, city, dzongkhag,
             emergency_contact_name, emergency_contact_phone, ' . ($hasAgeColumn ? 'age' : 'NULL AS age') . ', ' . ($hasGenderColumn ? 'gender' : 'NULL AS gender') . ',
                 ' . $statusSelect . ',
                 ' . $deferredSelect . ',
@@ -82,13 +80,22 @@ try {
             ' . $eligibilitySelect . ',
             ' . $testResultSelect . ',
             ' . $workflowStatusSelect . ',
-                created_at
-         FROM tbldonors
-         WHERE email = ?
-         LIMIT 1'
-    );
-    $stmt->execute([$email]);
-    $profile = $stmt->fetch(PDO::FETCH_ASSOC);
+                created_at';
+
+    // 1. Prefer the explicit user_id link (most reliable; no case/whitespace ambiguity).
+    $profile = null;
+    if ($tableHasColumn($pdo, 'tbldonors', 'user_id')) {
+        $stmt = $pdo->prepare("SELECT {$donorSelectColumns} FROM tbldonors WHERE user_id = ? LIMIT 1");
+        $stmt->execute([$userId]);
+        $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    // 2. Fall back to exact email match.
+    if (!$profile) {
+        $stmt = $pdo->prepare("SELECT {$donorSelectColumns} FROM tbldonors WHERE email = ? LIMIT 1");
+        $stmt->execute([$email]);
+        $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
 
     if ($role !== 'donor') {
         $userHasPhone = $tableHasColumn($pdo, 'tblusers', 'phone');
@@ -143,24 +150,24 @@ try {
 
     if (!$profile) {
         $stmtByNormalizedEmail = $pdo->prepare(
-            'SELECT id, full_name, email, phone, cid_number, date_of_birth, blood_type, address, city, dzongkhag,
-                    ' . ($hasAgeColumn ? 'age' : 'NULL AS age') . ', ' . ($hasGenderColumn ? 'gender' : 'NULL AS gender') . ',
-                    ' . $statusSelect . ',
-                    ' . $deferredSelect . ',
-                    ' . $deferralReasonSelect . ',
-                    ' . $deferredUntilSelect . ',
-                    ' . $sampleTestedSelect . ',
-                    ' . $sampleTestedAtSelect . ',
-                          ' . $eligibilitySelect . ',
-                          ' . $testResultSelect . ',
-                    ' . $workflowStatusSelect . ',
-                    created_at
-             FROM tbldonors
-             WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
-             LIMIT 1'
+            "SELECT {$donorSelectColumns}
+               FROM tbldonors
+              WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
+              LIMIT 1"
         );
         $stmtByNormalizedEmail->execute([$email]);
-        $profile = $stmtByNormalizedEmail->fetch(PDO::FETCH_ASSOC);
+        $profile = $stmtByNormalizedEmail->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    // Self-heal: once we've identified the donor row via email, persist
+    // the user_id link so subsequent requests take the fast (user_id) path.
+    if ($profile && $tableHasColumn($pdo, 'tbldonors', 'user_id') && (int)($profile['user_id'] ?? 0) !== $userId) {
+        try {
+            $linkStmt = $pdo->prepare('UPDATE tbldonors SET user_id = ? WHERE id = ? AND (user_id IS NULL OR user_id <> ?)');
+            $linkStmt->execute([$userId, (int)$profile['id'], $userId]);
+        } catch (Throwable $_) {
+            // best-effort backfill — ignore failures
+        }
     }
 
     if (!$profile) {

@@ -99,12 +99,14 @@ try {
     $antibioticsSelect = $columnExists($pdo, 'tbldonors', 'health_antibiotics') ? 'health_antibiotics' : 'NULL AS health_antibiotics';
     $surgerySelect = $columnExists($pdo, 'tbldonors', 'health_surgery') ? 'health_surgery' : 'NULL AS health_surgery';
     $coldFluSelect = $columnExists($pdo, 'tbldonors', 'health_no_cold_flu') ? 'health_no_cold_flu' : 'NULL AS health_no_cold_flu';
+    $cidSelect = $columnExists($pdo, 'tbldonors', 'cid_number') ? 'cid_number' : ($columnExists($pdo, 'tbldonors', 'cid') ? 'cid AS cid_number' : 'NULL AS cid_number');
 
     $sql = "SELECT
                 id,
                 full_name,
                 email,
                 phone,
+                {$cidSelect},
                 date_of_birth,
                 blood_type,
                 {$genderSelect},
@@ -136,11 +138,22 @@ try {
         exit;
     }
 
+    $totalDonations = 0;
+    if ((bool)$pdo->query("SHOW TABLES LIKE 'donation_history'")->fetchColumn()) {
+        $countStmt = $pdo->prepare('SELECT COUNT(*) FROM donation_history WHERE donor_id = ? AND LOWER(TRIM(COALESCE(status, ""))) = "completed"');
+        $countStmt->execute([$donorId]);
+        $totalDonations = (int)$countStmt->fetchColumn();
+    }
+
+    $cidValue = trim((string)($row['cid_number'] ?? ''));
+
     $payload = [
         'id' => (int)$row['id'],
         'full_name' => (string)($row['full_name'] ?? ''),
         'email' => (string)($row['email'] ?? ''),
         'phone' => (string)($row['phone'] ?? ''),
+        'cid' => $cidValue,
+        'cid_number' => $cidValue,
         'date_of_birth' => $row['date_of_birth'] ?? null,
         'gender' => $row['gender'] ?? null,
         'blood_type' => (string)($row['blood_type'] ?? ''),
@@ -152,6 +165,7 @@ try {
         'deferred_until' => $row['deferred_until'] ?? null,
         'deferral_reason' => $row['deferral_reason'] ?? null,
         'health_declaration_summary' => $toHealthSummary($row),
+        'total_donations' => $totalDonations,
     ];
 
     echo json_encode(['success' => true, 'data' => $payload]);

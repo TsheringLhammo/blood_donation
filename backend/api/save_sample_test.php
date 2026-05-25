@@ -22,10 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Database configuration - direct connection (simpler approach)
-$DB_HOST = 'localhost';
-$DB_USER = 'root';
-$DB_PASS = '';
-$DB_NAME = 'blood_donation';
+$DB_HOST = getenv('DB_HOST') ?: 'localhost';
+$DB_USER = getenv('DB_USER') ?: 'root';
+$DB_PASS = getenv('DB_PASS') ?: '';
+$DB_NAME = getenv('DB_NAME') ?: 'blood_donation';
 
 require_once __DIR__ . '/workflow_helpers.php';
 

@@ -202,6 +202,18 @@
   background: #fff;
 }
 
+.notification-compact__list li.unread {
+  background: #fff5f5;
+  border-left: 3px solid #c1121f;
+}
+
+.notification-compact__empty {
+  padding: 24px 8px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
 @media (max-width: 720px) {
   .notification-compact__menu {
     width: min(360px, calc(100vw - 24px));

@@ -2699,7 +2699,19 @@
 
   color: inherit;
 
+  font: inherit;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  width: 100%;
+
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+
 }
+
+.admin-quick-card:hover { transform: translateY(-1px); }
 
 
 

@@ -46,12 +46,17 @@ $rolePlaceholders = implode(', ', array_fill(0, count($roleTargets), '?'));
 $params = array_merge($roleTargets, [$userId]);
 
 try {
+    // Admins also see broadcast notifications stored with user_id IS NULL
+    // (matches the SELECT convention used by get_admin_notifications.php).
+    $adminBroadcastClause = $role === 'admin' ? ' OR user_id IS NULL' : '';
+
     $sql = 'UPDATE tblnotifications
             SET is_read = 1
             WHERE is_read = 0
               AND (
                     role_target IN (' . $rolePlaceholders . ')
-                    OR user_id = ?
+                    OR user_id = ?'
+                  . $adminBroadcastClause . '
                   )';
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

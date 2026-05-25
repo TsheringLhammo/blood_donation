@@ -32,10 +32,6 @@ export default function DonorsManagement() {
     <AdminShell
       user={user}
       activeView="donorRecords"
-      onChangeView={(viewId) => {
-        if (viewId === "dashboard") navigate("/admin");
-        if (viewId === "donors") navigate("/admin/donors");
-      }}
       title="Donor Records"
       subtitle="Search, filter, preview, export, and update registered donor records"
     >
