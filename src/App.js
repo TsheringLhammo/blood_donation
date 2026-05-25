@@ -14,6 +14,7 @@ import Login from "./pages/Login";
 import BloodBanks from "./pages/BloodBankList";
 import PublicInformation from "./pages/PublicInformation";
 import Dashboard from "./pages/Dashboard";
+import DonorDashboard from "./pages/DonorDashboard";
 import DonorProfile from "./pages/DonorProfile";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminProfile from "./pages/AdminProfile";
@@ -33,7 +34,7 @@ function ProtectedRoute({ roles, children }) {
 
 function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ToastContainer
         position="top-right"
         autoClose={5000}
@@ -58,7 +59,8 @@ function App() {
         <Route path="/donating-blood" element={<Donatingblood />} />
         <Route path="/login" element={<Login />} />
         <Route path="/blood-banks" element={<BloodBanks />} />
-        <Route path="/dashboard" element={<ProtectedRoute roles={["donor"]}><Dashboard /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute roles={["donor"]}><DonorDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/legacy" element={<ProtectedRoute roles={["donor"]}><Dashboard /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute roles={["donor"]}><DonorProfile /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute roles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
         <Route path="/admin/profile" element={<ProtectedRoute roles={["admin"]}><AdminProfile /></ProtectedRoute>} />

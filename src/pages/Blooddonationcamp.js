@@ -5,8 +5,11 @@ import { titleCase } from "../utils/strings";
 
 const CAMP_API_URL = process.env.REACT_APP_CAMP_API_URL;
 
+// Relative paths so the React dev server's proxy forwards to the PHP
+// backend (port 8080 via docker) instead of trying port 80 directly.
 const DEFAULT_CAMP_API_URLS = [
-  "http://localhost/blood_donation/api/register_camp.php",
+  "/blood_donation/backend/api/register_camp.php",
+  "/blood_donation/api/register_camp.php",
 ];
 
 const getCandidateCampApiUrls = () => {
@@ -58,6 +61,15 @@ export default function BloodDonationCamp() {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+
+  // Pre-Registered Donor List (Phase 1)
+  const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
+  const emptyPreDonor = { donor_name: "", cid_number: "", blood_group: "", phone_number: "" };
+  const [preDonors, setPreDonors] = useState([]);
+  const addPreDonorRow = () => setPreDonors((rows) => [...rows, { ...emptyPreDonor }]);
+  const removePreDonorRow = (idx) => setPreDonors((rows) => rows.filter((_, i) => i !== idx));
+  const updatePreDonorRow = (idx, field, value) =>
+    setPreDonors((rows) => rows.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
 
   useEffect(() => {
     const handleResize = () => {
@@ -138,6 +150,16 @@ export default function BloodDonationCamp() {
       return;
     }
 
+    // Drop blank rows; keep ones that have at least a name.
+    const cleanPreDonors = preDonors
+      .map((r) => ({
+        donor_name: (r.donor_name || "").trim(),
+        cid_number: (r.cid_number || "").trim(),
+        blood_group: (r.blood_group || "").trim(),
+        phone_number: (r.phone_number || "").trim(),
+      }))
+      .filter((r) => r.donor_name || r.cid_number || r.blood_group || r.phone_number);
+
     const payload = {
       organizationName: titleCase(formData.organizationName),
       contactPerson: titleCase(formData.contactPerson),
@@ -151,6 +173,7 @@ export default function BloodDonationCamp() {
       expectedDonors: Number(formData.expectedDonors),
       facilities: formData.facilities || null,
       additionalInfo: formData.additionalInfo || null,
+      preRegisteredDonors: cleanPreDonors,
     };
 
     setIsSubmitting(true);
@@ -499,6 +522,73 @@ export default function BloodDonationCamp() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Pre-Registered Donor List */}
+            <div className="camp-section">
+              <div className="camp-predonor-head-block">
+                <h3 className="camp-predonor-title">👥 Pre-Registered Donor List (Optional)</h3>
+                <p className="camp-predonor-desc">
+                  Add the donors you expect at the camp. This list is used for verification and planning — it is <strong>not</strong> actual donation data.
+                </p>
+              </div>
+
+              {preDonors.length > 0 ? (
+                <div className="camp-predonor-table">
+                  <div className="camp-predonor-row camp-predonor-row-head">
+                    <span>Name</span>
+                    <span>CID Number</span>
+                    <span>Blood Group</span>
+                    <span>Phone Number</span>
+                    <span aria-hidden="true" />
+                  </div>
+                  {preDonors.map((row, idx) => (
+                    <div className="camp-predonor-row" key={idx}>
+                      <input
+                        type="text"
+                        placeholder="Donor name"
+                        value={row.donor_name}
+                        onChange={(e) => updatePreDonorRow(idx, "donor_name", e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        placeholder="11102000123"
+                        value={row.cid_number}
+                        maxLength={15}
+                        onChange={(e) => updatePreDonorRow(idx, "cid_number", e.target.value.replace(/\D/g, ""))}
+                      />
+                      <select
+                        value={row.blood_group}
+                        onChange={(e) => updatePreDonorRow(idx, "blood_group", e.target.value)}
+                      >
+                        <option value="">—</option>
+                        {BLOOD_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="17XXXXXX"
+                        value={row.phone_number}
+                        maxLength={15}
+                        onChange={(e) => updatePreDonorRow(idx, "phone_number", e.target.value.replace(/\D/g, ""))}
+                      />
+                      <button
+                        type="button"
+                        className="camp-predonor-remove"
+                        onClick={() => removePreDonorRow(idx)}
+                        aria-label={`Remove row ${idx + 1}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="camp-predonor-empty">No donors added yet. Click below to start adding.</p>
+              )}
+
+              <button type="button" className="camp-predonor-add" onClick={addPreDonorRow}>
+                + Add Donor
+              </button>
             </div>
 
             {/* Agreement */}

@@ -15,6 +15,11 @@ if ($status !== 'all') {
 }
 
 try {
+    $hasDonationHistory = (bool)$pdo->query("SHOW TABLES LIKE 'donation_history'")->fetchColumn();
+    $totalDonationsSelect = $hasDonationHistory
+        ? '(SELECT COUNT(*) FROM donation_history dh WHERE dh.donor_id = d.id AND LOWER(TRIM(COALESCE(dh.status, ""))) = "completed")'
+        : '0';
+
     $stmt = $pdo->query(
         'SELECT
             d.id,
@@ -24,6 +29,7 @@ try {
             d.cid_number,
             d.blood_type,
             d.workflow_status,
+            ' . $totalDonationsSelect . ' AS total_donations,
             ds.id AS sample_id,
             ds.review_status,
             ds.hiv_result,

@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./DoctorDashboard.css";
 import { authFetch, clearAuthSession, getStoredUser } from "../utils/auth";
+import DoctorShell from "../components/doctor/DoctorShell";
 import { titleCase } from "../utils/strings";
 
 const INITIAL_FORM = {
@@ -77,6 +78,26 @@ function buildHistoryFromRequests(requestRows) {
 
 export default function DoctorDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Scroll to the anchored section when the URL hash changes
+  // (so sidebar links #request-form / #request-status land correctly).
+  useEffect(() => {
+    const rawHash = (location.hash || "").replace(/^#/, "");
+    if (!rawHash) return undefined;
+    let attempt = 0;
+    const tick = () => {
+      const el = document.getElementById(rawHash);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      attempt += 1;
+      if (attempt < 10) setTimeout(tick, 100);
+    };
+    tick();
+    return undefined;
+  }, [location.hash]);
   const [user, setUser] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [submitted, setSubmitted] = useState(false);
@@ -292,43 +313,13 @@ export default function DoctorDashboard() {
   const docAvatarSrc = user?.profile_picture || getStoredUser()?.profile_picture || "";
 
   return (
+    <DoctorShell
+      user={user}
+      onLogout={handleLogout}
+      title="Doctor Dashboard"
+      subtitle="Submit and track official hospital blood requests"
+    >
     <div className="doctor-page">
-      <header className="doctor-topbar">
-        <div className="doctor-topbar-inner">
-          <div className="doctor-brand">Hospital Blood Request Desk</div>
-          <div className="doctor-user-actions">
-            <button className="doctor-user-pill" type="button" onClick={openProfileEditor} title="Edit profile">
-              <div className="avatar">
-                {docAvatarSrc ? <img src={docAvatarSrc} alt={user.name || 'Doctor'} /> : initials}
-              </div>
-              {user.name}
-            </button>
-            <button onClick={handleLogout}>Logout</button>
-          </div>
-        </div>
-      </header>
-
-      <main className="doctor-main">
-        <nav className="doctor-sidebar">
-          <div className="doctor-sidebar-header">Navigation</div>
-          <Link to="/blood-banks" className="doctor-nav-link">
-            <span className="doctor-nav-icon">🏥</span>
-            Blood Bank Directory
-          </Link>
-          <Link to="/staff" className="doctor-nav-link">
-            <span className="doctor-nav-icon">👥</span>
-            Staff Dashboard
-          </Link>
-          <Link to="/admin" className="doctor-nav-link">
-            <span className="doctor-nav-icon">⚙️</span>
-            Admin Dashboard
-          </Link>
-          <Link to="/" className="doctor-nav-link">
-            <span className="doctor-nav-icon">🏠</span>
-            Back to Home
-          </Link>
-        </nav>
-
         <section className="doctor-content">
           <section className="doctor-hero">
             <h1>Doctor / Nurse Dashboard</h1>
@@ -336,7 +327,7 @@ export default function DoctorDashboard() {
           </section>
 
           <section className="doctor-layout">
-            <article className="doctor-card">
+            <article id="request-form" className="doctor-card">
             <div className="form-header">
               <div className="form-hospital-title">
                 <p>BHUTAN BLOOD TRANSFUSION SERVICES</p>
@@ -460,7 +451,7 @@ export default function DoctorDashboard() {
             </form>
           </article>
 
-          <article className="doctor-card">
+          <article id="request-status" className="doctor-card">
             <h2>Request Status</h2>
             <div className="doctor-table-wrap">
               <table className="doctor-table">
@@ -530,19 +521,19 @@ export default function DoctorDashboard() {
 
           </section>
         </section>
-      </main>
 
-      {modalMessage && (
-        <div className="doctor-modal-overlay" role="dialog" aria-modal="true" aria-label="Request notice">
-          <div className="doctor-modal">
-            <h3>Cannot Submit Request</h3>
-            <p>{modalMessage}</p>
-            <div className="doctor-modal-actions">
-              <button type="button" onClick={() => setModalMessage("")}>OK</button>
+        {modalMessage && (
+          <div className="doctor-modal-overlay" role="dialog" aria-modal="true" aria-label="Request notice">
+            <div className="doctor-modal">
+              <h3>Cannot Submit Request</h3>
+              <p>{modalMessage}</p>
+              <div className="doctor-modal-actions">
+                <button type="button" onClick={() => setModalMessage("")}>OK</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </DoctorShell>
   );
 }

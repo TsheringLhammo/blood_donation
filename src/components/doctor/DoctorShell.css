@@ -1,0 +1,391 @@
+/* Doctor shell — same layout as donor/admin, but uses the doctor's
+   existing red (#c0001c) so the rest of the dashboard's buttons and
+   accents stay consistent. */
+.doctor-shell {
+  --doc-sidebar-width: 260px;
+  --doc-header-height: 76px;
+  --doc-red: #0d3d7a;
+  --doc-red-deep: #0a2f5e;
+  --doc-red-soft: #eff6ff;
+  --doc-bg: #f7f8fa;
+  --doc-line: #eef0f3;
+  --doc-ink-1: #111827;
+  --doc-ink-3: #6b7280;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--doc-sidebar-width) 1fr;
+  grid-template-rows: var(--doc-header-height) 1fr;
+  grid-template-areas:
+    "sidebar header"
+    "sidebar main";
+  background: var(--doc-bg);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ---------- Sidebar (white) ---------- */
+.doctor-shell-sidebar {
+  grid-area: sidebar;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: linear-gradient(180deg, #ffffff 0%, #f9f9f9 100%);
+  color: var(--doc-ink-1);
+  display: flex;
+  flex-direction: column;
+  padding: 22px 16px 18px;
+  z-index: 120;
+  border-right: 1px solid var(--doc-line);
+  box-shadow: 4px 0 16px rgba(15, 23, 42, 0.04);
+}
+
+.doctor-shell-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 6px 18px;
+  border-bottom: 1px solid var(--doc-line);
+  margin-bottom: 16px;
+}
+
+.doctor-shell-brand-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--doc-red);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 20px;
+}
+
+.doctor-shell-brand-text { min-width: 0; }
+.doctor-shell-brand-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: var(--doc-ink-1);
+}
+.doctor-shell-brand-subtitle {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--doc-ink-3);
+}
+
+.doctor-shell-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  padding-right: 4px;
+}
+
+.doctor-shell-nav::-webkit-scrollbar { width: 6px; }
+.doctor-shell-nav::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 3px; }
+
+.doctor-shell-nav-item {
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: #374151;
+  border-radius: 8px;
+  padding: 11px 14px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background .15s ease, color .15s ease;
+}
+
+.doctor-shell-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.doctor-shell-nav-text {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doctor-shell-nav-item:hover {
+  background: var(--doc-red-soft);
+  color: var(--doc-red);
+}
+
+.doctor-shell-nav-item.active {
+  background: var(--doc-red-soft);
+  color: var(--doc-red);
+  font-weight: 600;
+}
+
+.doctor-shell-nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 28px;
+  background: var(--doc-red);
+  border-radius: 0 4px 4px 0;
+}
+
+.doctor-shell-support {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  margin-top: 10px;
+  border-top: 1px solid var(--doc-line);
+}
+
+.doctor-shell-support-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: #fafbfc;
+  border: 1px solid var(--doc-line);
+  border-radius: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.doctor-shell-support-card-button {
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  transition: background .15s ease, transform .15s ease, border-color .15s ease;
+}
+.doctor-shell-support-card-button:hover {
+  background: var(--doc-red-soft);
+  border-color: #fde2e4;
+  transform: translateY(-1px);
+}
+
+.doctor-shell-support-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--doc-red);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 16px;
+}
+
+.doctor-shell-support-text { display: flex; flex-direction: column; min-width: 0; }
+.doctor-shell-support-text strong { color: var(--doc-ink-1); font-size: 13px; font-weight: 600; }
+.doctor-shell-support-text span { color: var(--doc-ink-3); font-size: 11px; margin-top: 2px; }
+
+.doctor-shell-support-cta {
+  border: 0;
+  background: var(--doc-red);
+  color: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease, transform .15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.doctor-shell-support-cta:hover { background: var(--doc-red-deep); transform: translateY(-1px); }
+
+/* ---------- Header (white) ---------- */
+.doctor-shell-header {
+  grid-area: header;
+  position: sticky;
+  top: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--doc-line);
+  color: var(--doc-ink-1);
+}
+
+.doctor-shell-menu {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--doc-ink-3);
+  font-size: 20px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.doctor-shell-menu:hover { background: #f3f4f6; color: var(--doc-ink-1); }
+
+.doctor-shell-titleblock { flex: 1 1 auto; min-width: 0; }
+.doctor-shell-titleblock h1 {
+  margin: 0;
+  color: var(--doc-ink-1);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.doctor-shell-titleblock p {
+  margin: 2px 0 0;
+  color: var(--doc-ink-3);
+  font-size: 13px;
+}
+
+.doctor-shell-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 0 0 auto;
+}
+
+.doctor-shell-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 10px 6px 6px;
+  cursor: pointer;
+  color: var(--doc-ink-1);
+  font: inherit;
+  transition: background .15s ease;
+}
+.doctor-shell-user-pill:hover { background: #f3f4f6; }
+
+.doctor-shell-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--doc-red);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.doctor-shell-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.doctor-shell-user-meta {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 1.15;
+}
+.doctor-shell-user-meta strong {
+  color: var(--doc-ink-1);
+  font-size: 14px;
+  font-weight: 600;
+}
+.doctor-shell-user-meta > span {
+  color: var(--doc-ink-3);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* ---------- Main content ---------- */
+.doctor-shell-main {
+  grid-area: main;
+  min-width: 0;
+  background: var(--doc-bg);
+}
+
+.doctor-shell-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 28px 36px;
+}
+
+/* Strip duplicate padding from the wrapped doctor page since the shell
+   already provides outer spacing. */
+.doctor-shell-content .doctor-page {
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+.doctor-shell-content .doctor-topbar,
+.doctor-shell-content .doctor-sidebar {
+  display: none;
+}
+.doctor-shell-content .doctor-main {
+  display: block;
+  padding: 0;
+  margin: 0;
+}
+.doctor-shell-content .doctor-content {
+  padding: 0;
+  margin: 0;
+}
+
+/* ---------- Backdrop / responsive ---------- */
+.doctor-shell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 105;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+@media (max-width: 1024px) {
+  .doctor-shell {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "main";
+  }
+
+  .doctor-shell-sidebar {
+    position: fixed;
+    left: calc(var(--doc-sidebar-width) * -1 - 20px);
+    top: 0;
+    width: var(--doc-sidebar-width);
+    height: 100vh;
+    transition: left 0.22s ease;
+  }
+  .doctor-shell-sidebar.open { left: 0; }
+  .doctor-shell-menu { display: inline-flex; }
+  .doctor-shell-content { padding: 18px; }
+}
+
+@media (max-width: 640px) {
+  .doctor-shell-titleblock h1 { font-size: 18px; }
+  .doctor-shell-titleblock p { display: none; }
+  .doctor-shell-user-meta { display: none; }
+  .doctor-shell-header { padding: 0 14px; gap: 8px; }
+  .doctor-shell-content { padding: 14px; }
+}

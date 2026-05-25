@@ -210,21 +210,24 @@ try {
     $updateStmt = $pdo->prepare('UPDATE tbldonors SET ' . implode(', ', $updateFields) . ' WHERE id = ?');
     $updateStmt->execute($updateValues);
 
-    // Log all changes to audit table
-    $auditStmt = $pdo->prepare(
-        'INSERT INTO tbldonor_audit_log (donor_id, changed_by_admin_id, changed_by_admin_name, field_name, old_value, new_value, changed_at)
-         VALUES (?, ?, ?, ?, ?, ?, NOW())'
-    );
+    // Log all changes to audit table (skip silently if table absent)
+    $auditTableExists = (bool)$pdo->query("SHOW TABLES LIKE 'tbldonor_audit_log'")->fetchColumn();
+    if ($auditTableExists) {
+        $auditStmt = $pdo->prepare(
+            'INSERT INTO tbldonor_audit_log (donor_id, changed_by_admin_id, changed_by_admin_name, field_name, old_value, new_value, changed_at)
+             VALUES (?, ?, ?, ?, ?, ?, NOW())'
+        );
 
-    foreach ($auditLogs as $log) {
-        $auditStmt->execute([
-            $donorId,
-            $adminId,
-            $adminName,
-            $log['field_name'],
-            $log['old_value'],
-            $log['new_value'],
-        ]);
+        foreach ($auditLogs as $log) {
+            $auditStmt->execute([
+                $donorId,
+                $adminId,
+                $adminName,
+                $log['field_name'],
+                $log['old_value'],
+                $log['new_value'],
+            ]);
+        }
     }
 
     $pdo->commit();

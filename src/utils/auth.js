@@ -65,8 +65,12 @@ export const authFetch = async (path, options = {}) => {
     addCandidate(`${API_BASE}/${normalizedPath}`);
   }
 
+  // Walk the candidate URLs in order. Only fall through to the next
+  // candidate when the endpoint truly isn't there (404 / network error /
+  // Apache returned an HTML page). Real responses (401, 403, 5xx, JSON
+  // payloads) belong to the first matching endpoint — return them
+  // immediately so we don't fire noisy 404s for the alternates.
   let lastResponse = null;
-  let authError = null;
   let notFoundError = null;
 
   for (const url of candidates) {
@@ -83,28 +87,17 @@ export const authFetch = async (path, options = {}) => {
 
     lastResponse = response;
 
-    const contentType = response.headers.get("content-type") || "";
-    const isJson = contentType.includes("application/json");
-
-    if (response.status === 401 || response.status === 403) {
-      authError = response;
-      continue;
-    }
-
     if (response.status === 404) {
       notFoundError = response;
       continue;
     }
 
-    if (response.ok && isJson) {
-      return response;
-    }
+    const contentType = response.headers.get("content-type") || "";
+    const isJson = contentType.includes("application/json");
 
-    if (!response.ok) {
-      return response;
-    }
-
-    if (!isJson) {
+    if (!isJson && response.ok) {
+      // 200 OK but not JSON — could be Apache directory listing or the
+      // SPA fallback page. Try the next candidate.
       const preview = (await response.clone().text()).trimStart();
       if (preview.startsWith("<")) {
         continue;
@@ -112,10 +105,6 @@ export const authFetch = async (path, options = {}) => {
     }
 
     return response;
-  }
-
-  if (authError) {
-    return authError;
   }
 
   if (notFoundError) {

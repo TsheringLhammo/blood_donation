@@ -9,16 +9,20 @@ const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(String(value).replace(" ", "T"));
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return {
+    date: new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(date),
+    time: new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(date),
+  };
 };
 
-function DownloadLinkBlob(blob, filename) {
+const formatDateLabel = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+};
+
+function downloadBlob(blob, filename) {
   const url = window.URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -28,6 +32,94 @@ function DownloadLinkBlob(blob, filename) {
   anchor.remove();
   window.URL.revokeObjectURL(url);
 }
+
+function getPageNumbers(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set([1, 2, total - 1, total, current - 1, current, current + 1]);
+  const sorted = Array.from(pages).filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out = [];
+  for (let i = 0; i < sorted.length; i++) {
+    out.push(sorted[i]);
+    if (i < sorted.length - 1 && sorted[i + 1] - sorted[i] > 1) out.push("...");
+  }
+  return out;
+}
+
+const componentTone = (component) => {
+  const c = String(component || "").toLowerCase();
+  if (c.includes("platelet")) return "platelets";
+  if (c.includes("plasma")) return "plasma";
+  if (c.includes("prbc") || c.includes("packed")) return "prbc";
+  return "whole";
+};
+
+const SvgDrop = (props) => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M12 2.5c-2.6 3.6-6.8 8.2-6.8 12.2A6.8 6.8 0 0 0 12 21.5a6.8 6.8 0 0 0 6.8-6.8c0-4-4.2-8.6-6.8-12.2z" />
+  </svg>
+);
+const SvgCalendar = (props) => (
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <path d="M8 3v4M16 3v4M3 10h18" />
+  </svg>
+);
+const SvgBag = (props) => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M9 2.5h6a1 1 0 0 1 1 1V7H8V3.5a1 1 0 0 1 1-1zM6.5 8h11l-.7 11.6A2 2 0 0 1 14.8 21.5H9.2a2 2 0 0 1-2-1.9L6.5 8z" />
+  </svg>
+);
+const SvgBank = (props) => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M4 9h4v11H4zM10 9h4v11h-4zM16 9h4v11h-4zM2 21h20v1.5H2zM12 2 2 7v1.5h20V7L12 2z" />
+  </svg>
+);
+const SvgSearch = (props) => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" {...props}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20.5 20.5-3.8-3.8" />
+  </svg>
+);
+const SvgRefresh = (props) => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M21 12a9 9 0 1 1-3-6.7" />
+    <path d="M21 3v5h-5" />
+  </svg>
+);
+const SvgFilter = (props) => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M3 5h18l-7 9v5l-4 2v-7L3 5z" />
+  </svg>
+);
+const SvgSort = (props) => (
+  <svg viewBox="0 0 12 16" width="10" height="14" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M6 1 1.5 6h9L6 1z" opacity=".35" />
+    <path d="M6 15l-4.5-5h9L6 15z" opacity=".35" />
+  </svg>
+);
+const SvgCheck = (props) => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="m5 12 5 5L20 7" />
+  </svg>
+);
+const SvgEye = (props) => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+const SvgDownload = (props) => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="M7 10l5 5 5-5M12 15V3" />
+  </svg>
+);
+const SvgGear = (props) => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+  </svg>
+);
 
 export default function DonationHistoryPanel({ embedded = false }) {
   const [user, setUser] = useState(null);
@@ -59,7 +151,6 @@ export default function DonationHistoryPanel({ embedded = false }) {
       window.location.href = "/blood_donation/login";
       return;
     }
-
     setUser(stored);
   }, []);
 
@@ -86,7 +177,6 @@ export default function DonationHistoryPanel({ embedded = false }) {
       if (!response.ok || !data.success) {
         throw new Error(data.message || "Failed to load donation history.");
       }
-
       setRows(Array.isArray(data.data) ? data.data : []);
       setSummary(data.summary || summary);
       setOptions(data.options || options);
@@ -118,7 +208,7 @@ export default function DonationHistoryPanel({ embedded = false }) {
       blood_bank: "",
       date_from: "",
       date_to: "",
-      per_page: 10,
+      per_page: filters.per_page,
     };
     setDraftFilters(empty);
     setFilters(empty);
@@ -128,19 +218,17 @@ export default function DonationHistoryPanel({ embedded = false }) {
   const exportCsv = async () => {
     setExporting(true);
     try {
-      const response = await authFetch(`backend/api/get_donation_history.php?${queryString}&per_page=100`, { cache: "no-store" });
+      const response = await authFetch(`backend/api/get_donation_history.php?${queryString}&per_page=1000`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.message || "Failed to export donation history.");
       }
-
       const rowsToExport = [
         ["Date & Time", "Donor Name", "CID", "Blood Bank", "Component Type", "Units", "Staff Name", "Status"],
         ...(Array.isArray(data.data) ? data.data : []).map((row) => [row.donation_date_time, row.donor_name, row.cid_masked, row.blood_bank, row.component_type, row.units, row.staff_name, row.status]),
       ];
-
       const csv = rowsToExport.map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-      DownloadLinkBlob(new Blob([csv], { type: "text/csv;charset=utf-8;" }), `donation-history-${new Date().toISOString().slice(0, 10)}.csv`);
+      downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8;" }), `donation-history-${new Date().toISOString().slice(0, 10)}.csv`);
       toast.success("Donation history export downloaded.");
     } catch (exportError) {
       toast.error(exportError.message || "Failed to export donation history.");
@@ -149,130 +237,187 @@ export default function DonationHistoryPanel({ embedded = false }) {
     }
   };
 
+  const changePage = (page) => {
+    if (page === "..." || page === pagination.page) return;
+    if (page < 1 || page > pagination.total_pages) return;
+    setPagination((current) => ({ ...current, page }));
+  };
+
+  const changePerPage = (value) => {
+    const per_page = Number(value) || 10;
+    setDraftFilters((current) => ({ ...current, per_page }));
+    setFilters((current) => ({ ...current, per_page }));
+    setPagination((current) => ({ ...current, page: 1, per_page }));
+  };
+
+  const dateRangeLabel = (filters.date_from || filters.date_to)
+    ? `${formatDateLabel(filters.date_from) || "Start"} - ${formatDateLabel(filters.date_to) || "End"}`
+    : "";
+
+  const startRow = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.per_page + 1;
+  const endRow = Math.min(pagination.page * pagination.per_page, pagination.total);
+  const pageNumbers = getPageNumbers(pagination.page, Math.max(pagination.total_pages, 1));
+
   return (
     <div className="donation-history-panel">
-      <section className="donation-history-hero">
-        <div>
-          <div className="donation-history-kicker">Hospital Workflow</div>
-          <h2 className="donation-history-title">Donation History</h2>
-          <p className="donation-history-subtitle">Completed donation events only. Linked to donor, blood bank, and staff records.</p>
-        </div>
-      </section>
-
-      <section className="donation-history-stats">
-        <article className="donation-history-stat">
-          <div className="donation-history-stat-icon" aria-hidden="true">🩸</div>
-          <div className="donation-history-stat-body">
-            <span className="donation-history-stat-label">Total Donations</span>
-            <strong className="donation-history-stat-value">{summary.total_donations}</strong>
-            <span className="donation-history-stat-caption">All completed donations</span>
+      <section className="dh-stats">
+        <article className="dh-stat">
+          <div className="dh-stat-icon"><SvgDrop /></div>
+          <div className="dh-stat-body">
+            <span className="dh-stat-label">Total Donations</span>
+            <strong className="dh-stat-value">{summary.total_donations}</strong>
+            <span className="dh-stat-caption">All time completed donations</span>
           </div>
         </article>
-        <article className="donation-history-stat">
-          <div className="donation-history-stat-icon" aria-hidden="true">📅</div>
-          <div className="donation-history-stat-body">
-            <span className="donation-history-stat-label">This Month</span>
-            <strong className="donation-history-stat-value">{summary.this_month}</strong>
-            <span className="donation-history-stat-caption">Completed this month</span>
+        <article className="dh-stat">
+          <div className="dh-stat-icon"><SvgCalendar /></div>
+          <div className="dh-stat-body">
+            <span className="dh-stat-label">This Month</span>
+            <strong className="dh-stat-value">{summary.this_month}</strong>
+            <span className="dh-stat-caption">Completed this month</span>
           </div>
         </article>
-        <article className="donation-history-stat">
-          <div className="donation-history-stat-icon" aria-hidden="true">🧪</div>
-          <div className="donation-history-stat-body">
-            <span className="donation-history-stat-label">Total Units</span>
-            <strong className="donation-history-stat-value">{summary.total_units}</strong>
-            <span className="donation-history-stat-caption">Bags collected</span>
+        <article className="dh-stat">
+          <div className="dh-stat-icon"><SvgBag /></div>
+          <div className="dh-stat-body">
+            <span className="dh-stat-label">Total Units</span>
+            <strong className="dh-stat-value">{summary.total_units}</strong>
+            <span className="dh-stat-caption">Units donated</span>
           </div>
         </article>
-        <article className="donation-history-stat">
-          <div className="donation-history-stat-icon" aria-hidden="true">🏥</div>
-          <div className="donation-history-stat-body">
-            <span className="donation-history-stat-label">Active Blood Banks</span>
-            <strong className="donation-history-stat-value">{summary.active_blood_banks}</strong>
-            <span className="donation-history-stat-caption">Operational locations</span>
+        <article className="dh-stat">
+          <div className="dh-stat-icon"><SvgBank /></div>
+          <div className="dh-stat-body">
+            <span className="dh-stat-label">Active Blood Banks</span>
+            <strong className="dh-stat-value">{summary.active_blood_banks}</strong>
+            <span className="dh-stat-caption">Currently active</span>
           </div>
         </article>
       </section>
 
-      <section className="donation-history-toolbar">
-        <div className="donation-history-toolbar-grid">
-          <label className="donation-history-field donation-history-field-wide">
-            <span>Search by Donor Name or CID</span>
-            <div className="donation-history-input-wrap">
+      <section className="dh-filters">
+        <div className="dh-filters-grid">
+          <label className="dh-field">
+            <span>Search Donor by Name or CID</span>
+            <div className="dh-input dh-input-icon">
+              <SvgSearch className="dh-input-leading" />
               <input
                 type="text"
-                placeholder="Search name or CID"
+                placeholder="Search name or CID..."
                 value={draftFilters.search}
-                onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))}
+                onChange={(event) => setDraftFilters((c) => ({ ...c, search: event.target.value }))}
               />
+              <button
+                type="button"
+                className="dh-input-action"
+                onClick={applyFilters}
+                aria-label="Search"
+              >
+                <SvgSearch />
+              </button>
             </div>
           </label>
-          <label className="donation-history-field">
+          <label className="dh-field">
             <span>Blood Group</span>
-            <select value={draftFilters.blood_group} onChange={(event) => setDraftFilters((current) => ({ ...current, blood_group: event.target.value }))}>
-              <option value="">All Blood Groups</option>
-              {(options.blood_groups || []).map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
+            <div className="dh-input dh-input-select">
+              <SvgDrop className="dh-input-leading dh-icon-red" />
+              <select value={draftFilters.blood_group} onChange={(event) => setDraftFilters((c) => ({ ...c, blood_group: event.target.value }))}>
+                <option value="">All Blood Groups</option>
+                {(options.blood_groups || []).map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
           </label>
-          <label className="donation-history-field">
+          <label className="dh-field">
             <span>Component Type</span>
-            <select value={draftFilters.component_type} onChange={(event) => setDraftFilters((current) => ({ ...current, component_type: event.target.value }))}>
-              <option value="">All Components</option>
-              {(options.component_types || []).map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
+            <div className="dh-input dh-input-select">
+              <span className="dh-input-leading dh-icon-grid" aria-hidden="true">
+                <i /><i /><i /><i />
+              </span>
+              <select value={draftFilters.component_type} onChange={(event) => setDraftFilters((c) => ({ ...c, component_type: event.target.value }))}>
+                <option value="">All Components</option>
+                {(options.component_types || []).map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
           </label>
-          <label className="donation-history-field">
+          <label className="dh-field">
             <span>Blood Bank</span>
-            <select value={draftFilters.blood_bank} onChange={(event) => setDraftFilters((current) => ({ ...current, blood_bank: event.target.value }))}>
-              <option value="">All Blood Banks</option>
-              {(options.blood_banks || []).map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </label>
-          <label className="donation-history-field">
-            <span>Date From</span>
-            <input type="date" value={draftFilters.date_from} onChange={(event) => setDraftFilters((current) => ({ ...current, date_from: event.target.value }))} />
-          </label>
-          <label className="donation-history-field">
-            <span>Date To</span>
-            <input type="date" value={draftFilters.date_to} onChange={(event) => setDraftFilters((current) => ({ ...current, date_to: event.target.value }))} />
-          </label>
-          <label className="donation-history-field donation-history-field-small">
-            <span>Rows</span>
-            <select value={draftFilters.per_page} onChange={(event) => setDraftFilters((current) => ({ ...current, per_page: Number(event.target.value) }))}>
-              {PER_PAGE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
+            <div className="dh-input dh-input-select">
+              <SvgBank className="dh-input-leading dh-icon-red" />
+              <select value={draftFilters.blood_bank} onChange={(event) => setDraftFilters((c) => ({ ...c, blood_bank: event.target.value }))}>
+                <option value="">All Blood Banks</option>
+                {(options.blood_banks || []).map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
           </label>
         </div>
 
-        <div className="donation-history-toolbar-actions">
-          <button type="button" className="donation-history-button secondary" onClick={clearFilters}>Clear Filters</button>
-          <button type="button" className="donation-history-button primary" onClick={applyFilters}>Apply Filters</button>
-          <button type="button" className="donation-history-button ghost" onClick={exportCsv} disabled={exporting}>Export CSV</button>
+        <div className="dh-filters-row2">
+          <label className="dh-field dh-field-range">
+            <span>Date Range</span>
+            <div className="dh-input dh-input-range">
+              <SvgCalendar className="dh-input-leading dh-icon-red" />
+              <input
+                type="date"
+                value={draftFilters.date_from}
+                onChange={(event) => setDraftFilters((c) => ({ ...c, date_from: event.target.value }))}
+                aria-label="Date from"
+              />
+              <span className="dh-range-sep">–</span>
+              <input
+                type="date"
+                value={draftFilters.date_to}
+                onChange={(event) => setDraftFilters((c) => ({ ...c, date_to: event.target.value }))}
+                aria-label="Date to"
+              />
+              {dateRangeLabel ? <span className="dh-range-preview">{dateRangeLabel}</span> : null}
+            </div>
+          </label>
+
+          <div className="dh-filters-actions">
+            <button type="button" className="dh-btn dh-btn-ghost" onClick={clearFilters}>
+              <SvgRefresh /> Clear Filters
+            </button>
+            <button type="button" className="dh-btn dh-btn-primary" onClick={applyFilters}>
+              <SvgFilter /> Apply Filters
+            </button>
+          </div>
         </div>
       </section>
 
-      <section className="donation-history-card">
-        <div className="donation-history-card-head">
-          <div>
-            <h3>Donation Records</h3>
-            <p>Showing completed donation events only.</p>
+      <section className="dh-card">
+        <div className="dh-card-head">
+          <div className="dh-card-title">
+            <span className="dh-card-title-icon"><SvgDrop /></span>
+            <div>
+              <h3>Donation Records</h3>
+              <p>Showing completed donations by default</p>
+            </div>
           </div>
-          <div className="donation-history-card-meta">
-            <span>{pagination.total} records</span>
-            <span>{pagination.total_pages} pages</span>
+          <div className="dh-card-actions">
+            <button type="button" className="dh-btn dh-btn-ghost" onClick={exportCsv} disabled={exporting}>
+              <SvgDownload /> {exporting ? "Exporting..." : "Export CSV"}
+            </button>
+            <button type="button" className="dh-btn dh-btn-ghost dh-btn-icon" aria-label="Table options">
+              <SvgGear />
+            </button>
           </div>
         </div>
 
-        <div className="donation-history-table-wrap">
-          <table className="donation-history-table">
+        <div className="dh-table-wrap">
+          <table className="dh-table">
             <thead>
               <tr>
-                <th>Date &amp; Time</th>
+                <th className="dh-col-num">#</th>
+                <th>
+                  <button type="button" className="dh-th-sort">Date <SvgSort /></button>
+                </th>
                 <th>Donor Name</th>
-                <th>CID</th>
+                <th>
+                  <button type="button" className="dh-th-sort">CID <SvgSort /></button>
+                </th>
                 <th>Blood Bank</th>
                 <th>Component Type</th>
-                <th>Units (bags)</th>
+                <th>Units</th>
                 <th>Staff Name</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -280,52 +425,110 @@ export default function DonationHistoryPanel({ embedded = false }) {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="9"><div className="donation-history-empty">Loading donation history...</div></td></tr>
+                <tr><td colSpan="10"><div className="dh-empty">Loading donation history...</div></td></tr>
               ) : error ? (
-                <tr><td colSpan="9"><div className="donation-history-error">{error}</div></td></tr>
+                <tr><td colSpan="10"><div className="dh-error">{error}</div></td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan="9"><div className="donation-history-empty">No completed donation records match the current filters.</div></td></tr>
-              ) : rows.map((row) => (
-                <tr key={row.id}>
-                  <td className="donation-history-date">{formatDateTime(row.donation_date_time)}</td>
-                  <td className="donation-history-name">{row.donor_name}</td>
-                  <td className="donation-history-cid">{row.cid_masked || "—"}</td>
-                  <td className="donation-history-bank">{row.blood_bank || "—"}</td>
-                  <td><span className="donation-history-chip">{row.component_type}</span></td>
-                  <td className="donation-history-units">{row.units}</td>
-                  <td className="donation-history-staff">{row.staff_name}</td>
-                  <td><span className="donation-history-badge completed">🟢 Completed</span></td>
-                  <td>
-                    <button type="button" className="donation-history-action-btn" onClick={() => setViewRow(row)}>View details</button>
-                  </td>
-                </tr>
-              ))}
+                <tr><td colSpan="10"><div className="dh-empty">No completed donation records match the current filters.</div></td></tr>
+              ) : rows.map((row, index) => {
+                const dt = formatDateTime(row.donation_date_time);
+                const tone = componentTone(row.component_type);
+                const ComponentIcon = tone === "whole" ? SvgDrop : SvgBag;
+                return (
+                  <tr key={row.id ?? `${row.donation_id}-${index}`}>
+                    <td className="dh-col-num">{startRow + index}</td>
+                    <td>
+                      <div className="dh-date">{dt.date || "—"}</div>
+                      <div className="dh-time">{dt.time}</div>
+                    </td>
+                    <td className="dh-name">{row.donor_name || "—"}</td>
+                    <td className="dh-cid">{row.cid_masked || "—"}</td>
+                    <td className="dh-bank">{row.blood_bank || "—"}</td>
+                    <td>
+                      <span className={`dh-chip dh-chip-${tone}`}>
+                        <ComponentIcon /> {row.component_type || "—"}
+                      </span>
+                    </td>
+                    <td className="dh-units">{row.units}</td>
+                    <td className="dh-staff">{row.staff_name || "—"}</td>
+                    <td>
+                      <span className="dh-badge dh-badge-completed">
+                        <SvgCheck /> Completed
+                      </span>
+                    </td>
+                    <td>
+                      <button type="button" className="dh-icon-btn" aria-label="View details" onClick={() => setViewRow(row)}>
+                        <SvgEye />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        <div className="donation-history-footer">
-          <div className="donation-history-footer-left">Showing {rows.length} of {pagination.total} completed records</div>
-          <div className="donation-history-pagination">
-            <button type="button" className="donation-history-page-btn" disabled={pagination.page <= 1} onClick={() => setPagination((current) => ({ ...current, page: current.page - 1 }))}>Previous</button>
-            <span className="donation-history-page-indicator">Page {pagination.page} of {pagination.total_pages}</span>
-            <button type="button" className="donation-history-page-btn" disabled={pagination.page >= pagination.total_pages} onClick={() => setPagination((current) => ({ ...current, page: current.page + 1 }))}>Next</button>
+        <div className="dh-footer">
+          <div className="dh-footer-left">
+            <div className="dh-input dh-input-select dh-perpage">
+              <select value={filters.per_page} onChange={(event) => changePerPage(event.target.value)}>
+                {PER_PAGE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </div>
+            <span className="dh-footer-label">rows per page</span>
+          </div>
+
+          <div className="dh-footer-center">
+            Showing {startRow} to {endRow} of {pagination.total} records
+          </div>
+
+          <div className="dh-footer-right">
+            <button
+              type="button"
+              className="dh-page-nav"
+              disabled={pagination.page <= 1}
+              onClick={() => changePage(pagination.page - 1)}
+            >
+              Previous
+            </button>
+            <div className="dh-page-list">
+              {pageNumbers.map((p, i) => p === "..." ? (
+                <span key={`gap-${i}`} className="dh-page-gap">…</span>
+              ) : (
+                <button
+                  key={p}
+                  type="button"
+                  className={`dh-page-num${p === pagination.page ? " active" : ""}`}
+                  onClick={() => changePage(p)}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="dh-page-nav"
+              disabled={pagination.page >= pagination.total_pages}
+              onClick={() => changePage(pagination.page + 1)}
+            >
+              Next
+            </button>
           </div>
         </div>
       </section>
 
       {viewRow ? (
-        <div className="donation-history-modal-overlay" onClick={() => setViewRow(null)}>
-          <div className="donation-history-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="donation-history-modal-header">
+        <div className="dh-modal-overlay" onClick={() => setViewRow(null)}>
+          <div className="dh-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="dh-modal-head">
               <div>
                 <h3>Donation Details</h3>
                 <p>{viewRow.donor_name} · {viewRow.donation_id}</p>
               </div>
-              <button type="button" className="donation-history-modal-close" onClick={() => setViewRow(null)}>×</button>
+              <button type="button" className="dh-modal-close" onClick={() => setViewRow(null)}>×</button>
             </div>
-            <div className="donation-history-modal-grid">
-              <div><span>Date &amp; Time</span><strong>{formatDateTime(viewRow.donation_date_time)}</strong></div>
+            <div className="dh-modal-grid">
+              <div><span>Date &amp; Time</span><strong>{(() => { const dt = formatDateTime(viewRow.donation_date_time); return dt.date ? `${dt.date} ${dt.time}` : viewRow.donation_date_time; })()}</strong></div>
               <div><span>Donor</span><strong>{viewRow.donor_name}</strong></div>
               <div><span>CID</span><strong>{viewRow.cid_masked || "—"}</strong></div>
               <div><span>Blood Bank</span><strong>{viewRow.blood_bank || "—"}</strong></div>

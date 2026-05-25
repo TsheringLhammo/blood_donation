@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/certificate_helpers.php';
 
 bts_require_auth(['admin', 'staff']);
 
@@ -255,11 +256,15 @@ try {
             $values[] = $value;
         }
 
+        $donationHistoryId = 0;
         if (!empty($availableColumns)) {
             $placeholders = implode(', ', array_fill(0, count($availableColumns), '?'));
             $stmt = $pdo->prepare('INSERT INTO donation_history (' . implode(', ', $availableColumns) . ') VALUES (' . $placeholders . ')');
             $stmt->execute($values);
+            $donationHistoryId = (int)$pdo->lastInsertId();
         }
+
+        bts_issue_donor_milestone_certificates($pdo, $donorId, $donationHistoryId > 0 ? $donationHistoryId : null);
     }
 
     $pdo->commit();

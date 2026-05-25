@@ -157,9 +157,9 @@ if (!preg_match('/^\d{11}$/', $cidNumber)) {
     exit;
 }
 
-if ($weight < 45) {
+if ($weight < 45 || $weight > 250) {
     http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'Weight must be at least 45 kg.']);
+    echo json_encode(['success' => false, 'message' => 'Weight must be between 45 and 250 kg.']);
     exit;
 }
 

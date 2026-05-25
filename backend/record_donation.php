@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/api/certificate_helpers.php';
 
 session_start();
 if (!isset($_SESSION['role']) || !in_array((string)$_SESSION['role'], ['staff', 'admin'], true)) {
@@ -90,16 +91,16 @@ function ensure_donation_history_table(PDO $pdo): void
   );
 }
 
-function insert_donation_history(PDO $pdo, array $appointment, string $donationId, int $bloodBankId, string $bloodType, string $component, int $unitsCollected, int $actorUserId): void
+function insert_donation_history(PDO $pdo, array $appointment, string $donationId, int $bloodBankId, string $bloodType, string $component, int $unitsCollected, int $actorUserId): int
 {
   try {
     ensure_donation_history_table($pdo);
   } catch (Throwable $exception) {
-    return;
+    return 0;
   }
 
   if (!table_exists($pdo, 'donation_history')) {
-    return;
+    return 0;
   }
 
   $createdAt = date('Y-m-d H:i:s');
@@ -136,12 +137,14 @@ function insert_donation_history(PDO $pdo, array $appointment, string $donationI
   }
 
   if (empty($columns)) {
-    return;
+    return 0;
   }
 
   $placeholders = implode(', ', array_fill(0, count($columns), '?'));
   $stmt = $pdo->prepare('INSERT INTO donation_history (' . implode(', ', $columns) . ') VALUES (' . $placeholders . ')');
   $stmt->execute($values);
+
+  return (int)$pdo->lastInsertId();
 }
 
 function mark_appointment_completed(PDO $pdo, string $tableName, int $appointmentId): void
@@ -257,7 +260,7 @@ try {
         mark_appointment_completed($pdo, 'tblappointments', $appointmentId);
         mark_appointment_completed($pdo, 'appointments', $appointmentId);
 
-        insert_donation_history(
+        $donationHistoryId = insert_donation_history(
           $pdo,
           $appointment,
           $donationId,
@@ -267,6 +270,8 @@ try {
           1,
           (int)($_SESSION['user_id'] ?? $_SESSION['id'] ?? 0)
         );
+
+        bts_issue_donor_milestone_certificates($pdo, (int)$appointment['donor_id'], $donationHistoryId > 0 ? $donationHistoryId : null);
 
         if (has_column($pdo, 'tbldonors', 'last_donation_date')) {
             $donorUpdate = $pdo->prepare('UPDATE tbldonors SET last_donation_date = CURDATE() WHERE id = ?');

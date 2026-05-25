@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { authFetch, clearAuthSession, getStoredUser } from "../../utils/auth";
+import { certificateFromDonor, openCertificateWindow } from "../../utils/certificateTemplate";
 import "./DonorRecordsPanel.css";
 
 const BLOOD_GROUP_OPTIONS = ["", "A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
@@ -563,24 +564,10 @@ export default function DonorRecordsPanel({ embedded = false }) {
                 disabled={!donor || (donor.summary?.total_donations || 0) < 5}
                 onClick={() => {
                   if (!donor) return;
-                  const html = `
-                    <div class="page">
-                      <div class="header">
-                        <h1>Certificate of Appreciation</h1>
-                        <div class="muted">Blood Transfusion Admin</div>
-                      </div>
-                      <div class="content">
-                        <div class="card"><div class="label">Recipient</div><div class="value">${donor.basic?.name || "Donor"}</div></div>
-                        <div style="height:16px"></div>
-                        <div class="grid">
-                          <div class="card"><div class="label">CID</div><div class="value">${donor.basic?.cid || donor.basic?.cid_masked || "N/A"}</div></div>
-                          <div class="card"><div class="label">Total Donations</div><div class="value">${donor.summary?.total_donations || 0}</div></div>
-                        </div>
-                        <div style="height:16px"></div>
-                        <div class="card"><div class="label">Message</div><div class="value">Thank you for helping save lives through repeated blood donation.</div></div>
-                      </div>
-                    </div>`;
-                  openPrintPreview("Donation Certificate", html);
+                  const certificate = certificateFromDonor(donor, { name: user?.name, role: user?.role });
+                  if (!openCertificateWindow(certificate)) {
+                    toast.error("Popup blocked. Please allow popups for this site to view the certificate.");
+                  }
                 }}
               >
                 Generate Certificate

@@ -62,6 +62,50 @@ $expectedDonorsRaw = $payload['expectedDonors'] ?? '';
 $facilities = trim((string)($payload['facilities'] ?? ''));
 $additionalInfo = trim((string)($payload['additionalInfo'] ?? ''));
 
+// Pre-registered donor list (optional). Each entry may carry
+// donor_name | name, cid_number | cid, blood_group | bloodGroup, phone_number | phone.
+$preDonorsInput = $payload['preRegisteredDonors'] ?? $payload['pre_registered_donors'] ?? [];
+if (!is_array($preDonorsInput)) {
+    $preDonorsInput = [];
+}
+$preDonors = [];
+$bloodGroupWhitelist = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+foreach ($preDonorsInput as $entry) {
+    if (!is_array($entry)) continue;
+    $name = trim((string)($entry['donor_name'] ?? $entry['name'] ?? ''));
+    $cid = trim((string)($entry['cid_number'] ?? $entry['cid'] ?? ''));
+    $bloodGroup = strtoupper(trim((string)($entry['blood_group'] ?? $entry['bloodGroup'] ?? '')));
+    $phoneEntry = trim((string)($entry['phone_number'] ?? $entry['phone'] ?? ''));
+    if ($name === '') {
+        // skip blank rows entirely; reject only when name missing but other fields present.
+        if ($cid === '' && $bloodGroup === '' && $phoneEntry === '') continue;
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => 'Pre-registered donor entry is missing a name.']);
+        exit;
+    }
+    if ($bloodGroup !== '' && !in_array($bloodGroup, $bloodGroupWhitelist, true)) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => "Invalid blood group for {$name}."]);
+        exit;
+    }
+    if ($cid !== '' && !preg_match('/^\d{6,15}$/', $cid)) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => "Invalid CID for {$name}. Use digits only."]);
+        exit;
+    }
+    if ($phoneEntry !== '' && !preg_match('/^\d{7,15}$/', $phoneEntry)) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'message' => "Invalid phone number for {$name}."]);
+        exit;
+    }
+    $preDonors[] = [
+        'donor_name' => $name,
+        'cid_number' => $cid !== '' ? $cid : null,
+        'blood_group' => $bloodGroup !== '' ? $bloodGroup : null,
+        'phone_number' => $phoneEntry !== '' ? $phoneEntry : null,
+    ];
+}
+
 $requiredFields = [
     'organizationName' => $organizationName,
     'contactPerson' => $contactPerson,
@@ -190,13 +234,19 @@ if ($email !== '') {
 }
 
 try {
-    $query = "INSERT INTO {$tableName}
-        (organization_name, contact_person, phone_number, email, dzongkhag, camp_type, venue_address, preferred_date, alternate_date, expected_donors, facilities_available, additional_info)
-        VALUES
-        (:organization_name, :contact_person, :phone_number, :email, :dzongkhag, :camp_type, :venue_address, :preferred_date, :alternate_date, :expected_donors, :facilities_available, :additional_info)";
+    $hasCampCodeColumn = false;
+    try {
+        $hasCampCodeColumn = (bool)$pdo->query("SHOW COLUMNS FROM {$tableName} LIKE 'camp_code'")->fetchColumn();
+    } catch (Throwable $_) {
+        $hasCampCodeColumn = false;
+    }
+    $hasPreDonorsTable = (bool)$pdo->query("SHOW TABLES LIKE 'tblcamp_pre_donors'")->fetchColumn();
 
-    $statement = $pdo->prepare($query);
-    $statement->execute([
+    $pdo->beginTransaction();
+
+    $columns = ['organization_name', 'contact_person', 'phone_number', 'email', 'dzongkhag', 'camp_type', 'venue_address', 'preferred_date', 'alternate_date', 'expected_donors', 'facilities_available', 'additional_info'];
+    $placeholders = array_map(static fn($c) => ":{$c}", $columns);
+    $values = [
         ':organization_name' => $organizationName,
         ':contact_person' => $contactPerson,
         ':phone_number' => $phone,
@@ -209,18 +259,47 @@ try {
         ':expected_donors' => $expectedDonors,
         ':facilities_available' => $facilities !== '' ? $facilities : null,
         ':additional_info' => $additionalInfo !== '' ? $additionalInfo : null,
-    ]);
+    ];
+
+    $query = "INSERT INTO {$tableName} (" . implode(', ', $columns) . ") VALUES (" . implode(', ', $placeholders) . ")";
+    $statement = $pdo->prepare($query);
+    $statement->execute($values);
+
+    $campId = (int)$pdo->lastInsertId();
+
+    $campCode = null;
+    if ($hasCampCodeColumn) {
+        $campCode = sprintf('CAMP-%s-%04d', date('Y'), $campId);
+        $updateCode = $pdo->prepare("UPDATE {$tableName} SET camp_code = :code WHERE id = :id");
+        $updateCode->execute([':code' => $campCode, ':id' => $campId]);
+    }
+
+    if ($hasPreDonorsTable && !empty($preDonors)) {
+        $insertPre = $pdo->prepare('INSERT INTO tblcamp_pre_donors (camp_id, donor_name, cid_number, blood_group, phone_number) VALUES (:camp_id, :donor_name, :cid_number, :blood_group, :phone_number)');
+        foreach ($preDonors as $donor) {
+            $insertPre->execute([
+                ':camp_id' => $campId,
+                ':donor_name' => $donor['donor_name'],
+                ':cid_number' => $donor['cid_number'],
+                ':blood_group' => $donor['blood_group'],
+                ':phone_number' => $donor['phone_number'],
+            ]);
+        }
+    }
+
+    $pdo->commit();
 
     http_response_code(201);
+    $referenceLabel = $campCode ?: ("#{$campId}");
+
     // Best-effort: send confirmation email and create in-app notification for admins
     try {
         require_once __DIR__ . '/../config/mailer.php';
         require_once __DIR__ . '/workflow_helpers.php';
 
-        $campId = (int)$pdo->lastInsertId();
         $subject = 'Camp request received';
-        $textBody = "Dear {$contactPerson},\n\nWe have received your camp request (ID: {$campId}). We will review and contact you with next steps.\n\nRegards,\nBlood Transfusion Services";
-        $htmlBody = "<p>Dear {$contactPerson},</p><p>We have received your camp request (ID: <strong>{$campId}</strong>). We will review and contact you with next steps.</p><p>Regards,<br/>Blood Transfusion Services</p>";
+        $textBody = "Dear {$contactPerson},\n\nWe have received your camp request (Reference: {$referenceLabel}). We will review and contact you with next steps.\n\nRegards,\nBlood Transfusion Services";
+        $htmlBody = "<p>Dear {$contactPerson},</p><p>We have received your camp request (Reference: <strong>{$referenceLabel}</strong>). We will review and contact you with next steps.</p><p>Regards,<br/>Blood Transfusion Services</p>";
 
         $meta = [];
         if ($email !== '') {
@@ -231,7 +310,7 @@ try {
             $notif = [
                 'role_target' => 'admin',
                 'title' => 'New camp request',
-                'message' => "Camp request #{$campId} from {$organizationName} ({$contactPerson})",
+                'message' => "Camp request {$referenceLabel} from {$organizationName} ({$contactPerson})",
                 'severity' => 'info',
                 'channel' => 'in_app',
                 'is_read' => 0,
@@ -246,9 +325,12 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'Camp request submitted successfully.',
-        'id' => (int)$pdo->lastInsertId(),
+        'id' => $campId,
+        'camp_code' => $campCode,
+        'pre_registered_donors_count' => count($preDonors),
     ]);
 } catch (PDOException $exception) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     http_response_code(500);
     echo json_encode([
         'success' => false,

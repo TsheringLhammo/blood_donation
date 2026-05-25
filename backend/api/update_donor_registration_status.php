@@ -60,7 +60,8 @@ if (!in_array($requestedStatus, ['confirmed', 'approved', 'active', 'rejected'],
 
 $approvalStatus = in_array($requestedStatus, ['confirmed', 'approved', 'active'], true) ? 'approved' : 'rejected';
 $publicStatus = $approvalStatus === 'approved' ? 'Approved to Donate' : 'Initially rejected';
-$workflowStatus = $approvalStatus === 'approved' ? 'approved_to_donate' : 'initially_rejected';
+// Map to the tbldonors.workflow_status ENUM values.
+$workflowStatus = $approvalStatus === 'approved' ? 'approved_for_blood_draw' : 'decision_made_rejected';
 
 try {
     $pdo->beginTransaction();
